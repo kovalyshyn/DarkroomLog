@@ -19,6 +19,18 @@ struct SessionListView: View {
             .listStyle(.insetGrouped)
             .navigationTitle("Darkroom")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        NavigationLink(destination: EquipmentLibraryView()) {
+                            Label("Equipment", systemImage: "tray.full")
+                        }
+                        NavigationLink(destination: AboutView()) {
+                            Label("About", systemImage: "info.circle")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink(destination: TimerView()) {
                         Image(systemName: "timer")
@@ -62,6 +74,7 @@ struct SessionRowView: View {
                     .foregroundStyle(.blue)
                     .clipShape(Capsule())
             }
+
             HStack(spacing: 4) {
                 if !session.enlarger.isEmpty {
                     Text(session.enlarger)
