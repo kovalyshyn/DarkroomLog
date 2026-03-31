@@ -9,6 +9,8 @@ struct EquipmentLibraryView: View {
 
     @State private var addingType: EquipmentType?
     @State private var newName = ""
+    @State private var editingItem: Equipment?
+    @State private var editName = ""
 
     private func items(for type: EquipmentType) -> [Equipment] {
         allEquipment.filter { $0.category == type.rawValue }.sorted { $0.name < $1.name }
@@ -20,6 +22,15 @@ struct EquipmentLibraryView: View {
                 Section(type.pluralLabel) {
                     ForEach(items(for: type)) { item in
                         Text(item.name)
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    editingItem = item
+                                    editName = item.name
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                .tint(.blue)
+                            }
                     }
                     .onDelete { offsets in
                         let list = items(for: type)
@@ -59,6 +70,22 @@ struct EquipmentLibraryView: View {
                 newName = ""
                 addingType = nil
             }
+        }
+        .alert(
+            "Edit \(editingItem?.name ?? "")",
+            isPresented: Binding(
+                get: { editingItem != nil },
+                set: { if !$0 { editingItem = nil } }
+            )
+        ) {
+            TextField("Name", text: $editName)
+            Button("Save") {
+                let trimmed = editName.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.isEmpty else { return }
+                editingItem?.name = trimmed
+                editingItem = nil
+            }
+            Button("Cancel", role: .cancel) { editingItem = nil }
         }
     }
 }

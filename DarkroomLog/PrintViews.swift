@@ -1,12 +1,14 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import Combine
 
 struct AddPrintView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     let session: Session
 
+    @State private var printName: String = ""
     @State private var exposureTimes: [Int] = [10]
     @State private var notes: String = ""
     @State private var selectedPhoto: PhotosPickerItem?
@@ -15,6 +17,10 @@ struct AddPrintView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("Print") {
+                    TextField("Name (optional)", text: $printName)
+                }
+
                 Section("Exposure") {
                     ForEach(exposureTimes.indices, id: \.self) { i in
                         HStack {
@@ -79,6 +85,7 @@ struct AddPrintView: View {
 
     private func save() {
         let newPrint = Print(exposureTimes: exposureTimes, notes: notes)
+        newPrint.name = printName
         newPrint.photoData = photoData
         newPrint.session = session
         session.prints.append(newPrint)
@@ -92,10 +99,18 @@ struct PrintDetailView: View {
     @Bindable var print: Print
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var showFullscreen = false
+    @State private var showWashTimerPicker = false
     @State private var times: [Int] = []
+    @State private var activeWashTimer: WashTimer? = nil
+    @State private var now = Date()
+    private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         Form {
+            Section("Print") {
+                TextField("Name (optional)", text: $print.name)
+            }
+
             Section("Exposure") {
                 ForEach(times.indices, id: \.self) { i in
                     HStack {
@@ -117,6 +132,28 @@ struct PrintDetailView: View {
                     NavigationLink(destination: TimerView(intervals: times)) {
                         Label("Start Timer", systemImage: "timer")
                             .foregroundStyle(.red)
+                    }
+                }
+            }
+
+            Section("Wash Timer") {
+                if let wt = activeWashTimer {
+                    HStack {
+                        Label(formatRemaining(wt.endDate.timeIntervalSince(now)), systemImage: "hourglass")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                        Spacer()
+                        Button("Stop", role: .destructive) {
+                            NotificationManager.shared.cancelTimer(id: wt.id)
+                            activeWashTimer = nil
+                        }
+                    }
+                } else {
+                    Button {
+                        NotificationManager.shared.requestPermission()
+                        showWashTimerPicker = true
+                    } label: {
+                        Label("Start Wash Timer", systemImage: "hourglass")
                     }
                 }
             }
@@ -155,7 +192,7 @@ struct PrintDetailView: View {
                 }
             }
         }
-        .navigationTitle("Print detail")
+        .navigationTitle(print.name.isEmpty ? "Print detail" : print.name)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             let existing = print.exposureTimes
@@ -165,10 +202,23 @@ struct PrintDetailView: View {
             } else {
                 times = existing
             }
+            activeWashTimer = NotificationManager.shared.activeTimer(for: print.id.uuidString)
         }
         .onChange(of: times) { _, newTimes in
             print.exposureTimes = newTimes
             print.exposureSeconds = newTimes.first ?? 0
+        }
+        .onReceive(ticker) { date in
+            now = date
+            activeWashTimer = NotificationManager.shared.activeTimer(for: print.id.uuidString)
+        }
+        .confirmationDialog("Wash Timer", isPresented: $showWashTimerPicker, titleVisibility: .visible) {
+            Button("10 minutes") { scheduleWash(minutes: 10) }
+            Button("20 minutes") { scheduleWash(minutes: 20) }
+            Button("30 minutes") { scheduleWash(minutes: 30) }
+            Button("40 minutes") { scheduleWash(minutes: 40) }
+            Button("60 minutes") { scheduleWash(minutes: 60) }
+            Button("Cancel", role: .cancel) { }
         }
         .fullScreenCover(isPresented: $showFullscreen) {
             if let data = print.photoData, let uiImage = UIImage(data: data) {
@@ -177,6 +227,23 @@ struct PrintDetailView: View {
                 }
             }
         }
+    }
+
+    private func scheduleWash(minutes: Int) {
+        let label = print.name.isEmpty ? print.createdAt.formatted(date: .omitted, time: .shortened) : print.name
+        NotificationManager.shared.scheduleWashTimer(
+            printId: print.id.uuidString,
+            label: label,
+            minutes: minutes
+        )
+        activeWashTimer = NotificationManager.shared.activeTimer(for: print.id.uuidString)
+    }
+
+    private func formatRemaining(_ seconds: TimeInterval) -> String {
+        let s = max(0, Int(seconds))
+        let m = s / 60
+        let sec = s % 60
+        return String(format: "%d:%02d remaining", m, sec)
     }
 }
 

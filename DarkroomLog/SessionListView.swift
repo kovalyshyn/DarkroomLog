@@ -1,14 +1,43 @@
 import SwiftUI
 import SwiftData
+import Combine
 
 struct SessionListView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \Session.date, order: .reverse) private var sessions: [Session]
     @State private var showNewSession = false
+    @State private var washTimers: [WashTimer] = []
+    private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         NavigationStack {
             List {
+                if !washTimers.isEmpty {
+                    Section("Wash Timers") {
+                        ForEach(washTimers) { wt in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(wt.printLabel)
+                                        .font(.subheadline)
+                                    Text(formatRemaining(wt.remaining))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .monospacedDigit()
+                                }
+                                Spacer()
+                                Button {
+                                    NotificationManager.shared.cancelTimer(id: wt.id)
+                                    washTimers = NotificationManager.shared.loadTimers()
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+
                 ForEach(sessions) { session in
                     NavigationLink(destination: SessionDetailView(session: session)) {
                         SessionRowView(session: session)
@@ -50,7 +79,20 @@ struct SessionListView: View {
             .sheet(isPresented: $showNewSession) {
                 NewSessionView()
             }
+            .onAppear {
+                washTimers = NotificationManager.shared.loadTimers()
+            }
+            .onReceive(ticker) { _ in
+                washTimers = NotificationManager.shared.loadTimers()
+            }
         }
+    }
+
+    private func formatRemaining(_ seconds: TimeInterval) -> String {
+        let s = max(0, Int(seconds))
+        let m = s / 60
+        let sec = s % 60
+        return String(format: "%d:%02d remaining", m, sec)
     }
 
     private func deleteSessions(at offsets: IndexSet) {

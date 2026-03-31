@@ -63,6 +63,7 @@ class Session {
 @Model
 class Print {
     var id: UUID
+    var name: String = ""
     var exposureSeconds: Int   // kept for migration from v1.0
     var exposureTimesData: String = ""
     var notes: String

@@ -108,8 +108,14 @@ struct PrintRowView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 let times = print.exposureTimes
-                Text(times.isEmpty ? "\(print.exposureSeconds) sec" : times.map { "\($0)s" }.joined(separator: " · "))
+                let timeStr = times.isEmpty ? "\(print.exposureSeconds) sec" : times.map { "\($0)s" }.joined(separator: " · ")
+                Text(print.name.isEmpty ? timeStr : print.name)
                     .font(.headline)
+                if !print.name.isEmpty {
+                    Text(timeStr)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 if !print.notes.isEmpty {
                     Text(print.notes)
