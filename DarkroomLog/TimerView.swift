@@ -4,20 +4,35 @@ import CoreMotion
 
 struct TimerView: View {
     var onStop: ((Int) -> Void)? = nil
+    var intervals: [Int] = []
 
     @State private var elapsed: Int = 0
     @State private var isRunning: Bool = false
     @State private var timer: Timer? = nil
     @State private var audioPlayer: AVAudioPlayer?
+    @State private var bellPlayer: AVAudioPlayer?
     @State private var motionManager = CMMotionManager()
     @State private var lastGestureTime: Date = .distantPast
     @State private var inFreefall = false
     @State private var freefallStart: Date = .distantPast
     @State private var originalBrightness: CGFloat = UIApplication.shared.connectedScenes
         .compactMap { $0 as? UIWindowScene }.first?.screen.brightness ?? 0.5
+    @State private var nextTargetIndex: Int = 0
+
+    @AppStorage("metronomeEnabled") private var metronomeEnabled: Bool = true
 
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
+
+    private var cumulativeTargets: [Int] {
+        var result: [Int] = []
+        var sum = 0
+        for d in intervals {
+            sum += d
+            result.append(sum)
+        }
+        return result
+    }
 
     var body: some View {
         ZStack {
@@ -25,6 +40,13 @@ struct TimerView: View {
 
             VStack(spacing: 0) {
                 Spacer()
+
+                if !intervals.isEmpty && isRunning {
+                    Text("Step \(min(nextTargetIndex + 1, intervals.count)) of \(intervals.count)")
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundStyle(Color(red: 0.4, green: 0, blue: 0))
+                        .padding(.bottom, 8)
+                }
 
                 Text(formattedTime)
                     .font(.system(size: 100, weight: .thin, design: .monospaced))
@@ -112,9 +134,11 @@ struct TimerView: View {
         screen?.brightness = 0.02
         isRunning = true
         elapsed = 0
+        nextTargetIndex = 0
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             elapsed += 1
             playTick()
+            checkIntervalBell()
         }
     }
 
@@ -122,9 +146,11 @@ struct TimerView: View {
         guard isRunning else { return }
         timer?.invalidate()
         elapsed = 0
+        nextTargetIndex = 0
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             elapsed += 1
             playTick()
+            checkIntervalBell()
         }
     }
 
@@ -133,6 +159,20 @@ struct TimerView: View {
         timer = nil
         isRunning = false
         screen?.brightness = originalBrightness
+    }
+
+    // MARK: - Interval bells
+
+    private func checkIntervalBell() {
+        let targets = cumulativeTargets
+        guard nextTargetIndex < targets.count else { return }
+        if elapsed == targets[nextTargetIndex] {
+            playBell()
+            nextTargetIndex += 1
+            if nextTargetIndex >= targets.count {
+                stopTimer()
+            }
+        }
     }
 
     // MARK: - Audio
@@ -144,15 +184,25 @@ struct TimerView: View {
             audioPlayer = try? AVAudioPlayer(contentsOf: url)
             audioPlayer?.prepareToPlay()
         }
+        if let url = Bundle.main.url(forResource: "bell", withExtension: "wav") {
+            bellPlayer = try? AVAudioPlayer(contentsOf: url)
+            bellPlayer?.prepareToPlay()
+        }
     }
 
     private func playTick() {
+        guard metronomeEnabled else { return }
         if let player = audioPlayer {
             player.currentTime = 0
             player.play()
         } else {
             AudioServicesPlaySystemSound(1104)
         }
+    }
+
+    private func playBell() {
+        bellPlayer?.currentTime = 0
+        bellPlayer?.play()
     }
 
     // MARK: - Motion detection

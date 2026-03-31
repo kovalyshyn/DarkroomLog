@@ -24,6 +24,9 @@ struct SessionListView: View {
                         NavigationLink(destination: EquipmentLibraryView()) {
                             Label("Equipment", systemImage: "tray.full")
                         }
+                        NavigationLink(destination: SettingsView()) {
+                            Label("Settings", systemImage: "gearshape")
+                        }
                         NavigationLink(destination: AboutView()) {
                             Label("About", systemImage: "info.circle")
                         }

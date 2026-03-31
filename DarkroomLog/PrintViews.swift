@@ -7,28 +7,29 @@ struct AddPrintView: View {
     @Environment(\.dismiss) private var dismiss
     let session: Session
 
-    @State private var exposureSeconds: Int = 0
+    @State private var exposureTimes: [Int] = [10]
     @State private var notes: String = ""
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var photoData: Data?
-    @State private var showTimer = false
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Exposure") {
-                    HStack {
-                        Text("Time")
-                        Spacer()
-                        Text("\(exposureSeconds) sec")
-                            .foregroundStyle(.secondary)
-                        Stepper("", value: $exposureSeconds, in: 0...3600)
-                            .labelsHidden()
+                    ForEach(exposureTimes.indices, id: \.self) { i in
+                        HStack {
+                            Text("Step \(i + 1)")
+                            Spacer()
+                            Text("\(exposureTimes[i]) sec")
+                                .foregroundStyle(.secondary)
+                            Stepper("", value: $exposureTimes[i], in: 1...3600)
+                                .labelsHidden()
+                        }
                     }
-                    NavigationLink(destination: TimerView(onStop: { seconds in
-                        exposureSeconds = seconds
-                    })) {
-                        Label("Use Timer", systemImage: "timer")
+                    .onDelete { exposureTimes.remove(atOffsets: $0) }
+
+                    Button { exposureTimes.append(10) } label: {
+                        Label("Add step", systemImage: "plus")
                     }
                 }
 
@@ -77,7 +78,7 @@ struct AddPrintView: View {
     }
 
     private func save() {
-        let newPrint = Print(exposureSeconds: exposureSeconds, notes: notes)
+        let newPrint = Print(exposureTimes: exposureTimes, notes: notes)
         newPrint.photoData = photoData
         newPrint.session = session
         session.prints.append(newPrint)
@@ -91,17 +92,32 @@ struct PrintDetailView: View {
     @Bindable var print: Print
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var showFullscreen = false
+    @State private var times: [Int] = []
 
     var body: some View {
         Form {
             Section("Exposure") {
-                HStack {
-                    Text("Time")
-                    Spacer()
-                    Text("\(print.exposureSeconds) sec")
-                        .foregroundStyle(.secondary)
-                    Stepper("", value: $print.exposureSeconds, in: 0...3600)
-                        .labelsHidden()
+                ForEach(times.indices, id: \.self) { i in
+                    HStack {
+                        Text("Step \(i + 1)")
+                        Spacer()
+                        Text("\(times[i]) sec")
+                            .foregroundStyle(.secondary)
+                        Stepper("", value: $times[i], in: 1...3600)
+                            .labelsHidden()
+                    }
+                }
+                .onDelete { times.remove(atOffsets: $0) }
+
+                Button { times.append(10) } label: {
+                    Label("Add step", systemImage: "plus")
+                }
+
+                if !times.isEmpty {
+                    NavigationLink(destination: TimerView(intervals: times)) {
+                        Label("Start Timer", systemImage: "timer")
+                            .foregroundStyle(.red)
+                    }
                 }
             }
 
@@ -141,6 +157,19 @@ struct PrintDetailView: View {
         }
         .navigationTitle("Print detail")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            let existing = print.exposureTimes
+            if existing.isEmpty && print.exposureSeconds > 0 {
+                times = [print.exposureSeconds]
+                print.exposureTimesData = String(print.exposureSeconds)
+            } else {
+                times = existing
+            }
+        }
+        .onChange(of: times) { _, newTimes in
+            print.exposureTimes = newTimes
+            print.exposureSeconds = newTimes.first ?? 0
+        }
         .fullScreenCover(isPresented: $showFullscreen) {
             if let data = print.photoData, let uiImage = UIImage(data: data) {
                 PhotoFullscreenView(uiImage: uiImage) {

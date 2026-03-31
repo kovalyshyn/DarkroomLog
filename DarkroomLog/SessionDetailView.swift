@@ -107,7 +107,8 @@ struct PrintRowView: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(print.exposureSeconds) sec")
+                let times = print.exposureTimes
+                Text(times.isEmpty ? "\(print.exposureSeconds) sec" : times.map { "\($0)s" }.joined(separator: " · "))
                     .font(.headline)
 
                 if !print.notes.isEmpty {

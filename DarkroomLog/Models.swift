@@ -63,15 +63,22 @@ class Session {
 @Model
 class Print {
     var id: UUID
-    var exposureSeconds: Int
+    var exposureSeconds: Int   // kept for migration from v1.0
+    var exposureTimesData: String = ""
     var notes: String
     var createdAt: Date
     var photoData: Data?
     var session: Session?
 
-    init(exposureSeconds: Int = 0, notes: String = "") {
+    var exposureTimes: [Int] {
+        get { exposureTimesData.split(separator: ",").compactMap { Int($0) } }
+        set { exposureTimesData = newValue.map { String($0) }.joined(separator: ",") }
+    }
+
+    init(exposureTimes: [Int] = [], notes: String = "") {
         self.id = UUID()
-        self.exposureSeconds = exposureSeconds
+        self.exposureSeconds = exposureTimes.first ?? 0
+        self.exposureTimesData = exposureTimes.map { String($0) }.joined(separator: ",")
         self.notes = notes
         self.createdAt = Date()
     }
