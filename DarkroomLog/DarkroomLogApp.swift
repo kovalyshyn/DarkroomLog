@@ -9,8 +9,15 @@ struct DarkroomLogApp: App {
 
     var body: some Scene {
         WindowGroup {
-            SessionListView()
+            TabView {
+                Tab("Darkroom", systemImage: "photo.stack") {
+                    SessionListView()
+                }
+                Tab("Light Table", systemImage: "film") {
+                    FilmRollListView()
+                }
+            }
         }
-        .modelContainer(for: [Session.self, Print.self, Equipment.self])
+        .modelContainer(for: [Session.self, Print.self, Equipment.self, FilmRoll.self])
     }
 }

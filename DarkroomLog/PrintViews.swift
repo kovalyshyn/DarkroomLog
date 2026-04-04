@@ -9,6 +9,8 @@ struct AddPrintView: View {
     let session: Session
 
     @State private var printName: String = ""
+    @State private var selectedRoll: FilmRoll? = nil
+    @State private var pickingRoll = false
     @State private var exposureTimes: [Int] = [10]
     @State private var notes: String = ""
     @State private var selectedPhoto: PhotosPickerItem?
@@ -42,6 +44,22 @@ struct AddPrintView: View {
                 Section("Notes") {
                     TextField("Dodging, burning, grade, observations...", text: $notes, axis: .vertical)
                         .lineLimit(4...8)
+                }
+
+                Section("Film Roll") {
+                    Button {
+                        pickingRoll = true
+                    } label: {
+                        HStack {
+                            Text(selectedRoll.map { rollLabel($0) } ?? "None")
+                                .foregroundStyle(selectedRoll == nil ? .secondary : .primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
                 }
 
                 Section("Photo") {
@@ -80,13 +98,22 @@ struct AddPrintView: View {
                     Button("Save") { save() }
                 }
             }
+            .sheet(isPresented: $pickingRoll) {
+                FilmRollPickerView(selection: $selectedRoll)
+            }
         }
+    }
+
+    private func rollLabel(_ roll: FilmRoll) -> String {
+        let name = roll.name.isEmpty ? roll.film : roll.name
+        return name.isEmpty ? roll.filmType : "\(name) (\(roll.filmType))"
     }
 
     private func save() {
         let newPrint = Print(exposureTimes: exposureTimes, notes: notes)
         newPrint.name = printName
         newPrint.photoData = photoData
+        newPrint.filmRoll = selectedRoll
         newPrint.session = session
         session.prints.append(newPrint)
         context.insert(newPrint)
@@ -100,6 +127,7 @@ struct PrintDetailView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var showFullscreen = false
     @State private var showWashTimerPicker = false
+    @State private var pickingRoll = false
     @State private var times: [Int] = []
     @State private var activeWashTimer: WashTimer? = nil
     @State private var now = Date()
@@ -161,6 +189,22 @@ struct PrintDetailView: View {
             Section("Notes") {
                 TextField("Notes...", text: $print.notes, axis: .vertical)
                     .lineLimit(4...10)
+            }
+
+            Section("Film Roll") {
+                Button {
+                    pickingRoll = true
+                } label: {
+                    HStack {
+                        Text(print.filmRoll.map { rollLabel($0) } ?? "None")
+                            .foregroundStyle(print.filmRoll == nil ? .secondary : .primary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .foregroundStyle(.primary)
             }
 
             Section("Photo") {
@@ -227,6 +271,15 @@ struct PrintDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: $pickingRoll) {
+            FilmRollPickerView(selection: $print.filmRoll)
+        }
+    }
+
+    private func rollLabel(_ roll: FilmRoll) -> String {
+        let name = roll.name.isEmpty ? roll.film : roll.name
+        let type_ = roll.filmType
+        return name.isEmpty ? type_ : "\(name) (\(type_))"
     }
 
     private func scheduleWash(minutes: Int) {

@@ -5,6 +5,7 @@ import CoreMotion
 struct TimerView: View {
     var onStop: ((Int) -> Void)? = nil
     var intervals: [Int] = []
+    var darkroomMode: Bool = true
 
     @State private var elapsed: Int = 0
     @State private var isRunning: Bool = false
@@ -44,13 +45,15 @@ struct TimerView: View {
                 if !intervals.isEmpty && isRunning {
                     Text("Step \(min(nextTargetIndex + 1, intervals.count)) of \(intervals.count)")
                         .font(.system(size: 14, weight: .regular))
-                        .foregroundStyle(Color(red: 0.4, green: 0, blue: 0))
+                        .foregroundStyle(darkroomMode ? Color(red: 0.4, green: 0, blue: 0) : Color.white.opacity(0.5))
                         .padding(.bottom, 8)
                 }
 
                 Text(formattedTime)
                     .font(.system(size: 100, weight: .thin, design: .monospaced))
-                    .foregroundStyle(isRunning ? Color(red: 1, green: 0.08, blue: 0) : Color(red: 0.4, green: 0, blue: 0))
+                    .foregroundStyle(darkroomMode
+                        ? (isRunning ? Color(red: 1, green: 0.08, blue: 0) : Color(red: 0.4, green: 0, blue: 0))
+                        : (isRunning ? Color.white : Color.white.opacity(0.35)))
                     .contentTransition(.numericText())
                     .animation(.linear(duration: 0.1), value: elapsed)
 
@@ -58,7 +61,7 @@ struct TimerView: View {
 
                 Text(isRunning ? "tap · knock · toss to restart" : "tap to start")
                     .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(Color(red: 0.3, green: 0.05, blue: 0.05))
+                    .foregroundStyle(darkroomMode ? Color(red: 0.3, green: 0.05, blue: 0.05) : Color.white.opacity(0.3))
                     .padding(.bottom, 48)
             }
         }
@@ -75,10 +78,11 @@ struct TimerView: View {
         )
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text("Timer")
-                    .foregroundStyle(Color(red: 0.4, green: 0.1, blue: 0.1))
+                    .foregroundStyle(darkroomMode ? Color(red: 0.4, green: 0.1, blue: 0.1) : Color.white.opacity(0.6))
                     .font(.subheadline)
             }
             if onStop != nil {
@@ -131,7 +135,7 @@ struct TimerView: View {
 
     private func startTimer() {
         originalBrightness = screen?.brightness ?? 0.5
-        screen?.brightness = 0.02
+        if darkroomMode { screen?.brightness = 0.02 }
         isRunning = true
         elapsed = 0
         nextTargetIndex = 0

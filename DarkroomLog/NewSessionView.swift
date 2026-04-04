@@ -21,7 +21,7 @@ struct NewSessionView: View {
         NavigationStack {
             Form {
                 Section("Session name") {
-                    TextField("e.g. Portraits — March 2025", text: $name)
+                    TextField("e.g. Portraits — March 2026", text: $name)
                 }
 
                 Section("Equipment") {

@@ -2,11 +2,13 @@ import Foundation
 import SwiftData
 
 enum EquipmentType: String, CaseIterable {
-    case enlarger, lens, paper, developer
+    case enlarger, camera, lens, paper, filmStock, developer
 
     var label: String {
         switch self {
         case .enlarger:  return "Enlarger"
+        case .camera:    return "Camera"
+        case .filmStock: return "Film Stock"
         case .lens:      return "Lens"
         case .paper:     return "Paper"
         case .developer: return "Developer"
@@ -16,6 +18,8 @@ enum EquipmentType: String, CaseIterable {
     var pluralLabel: String {
         switch self {
         case .enlarger:  return "Enlargers"
+        case .camera:    return "Cameras"
+        case .filmStock: return "Film Stocks"
         case .lens:      return "Lenses"
         case .paper:     return "Papers"
         case .developer: return "Developers"
@@ -61,6 +65,32 @@ class Session {
 }
 
 @Model
+class FilmRoll {
+    var id: UUID
+    var name: String
+    var date: Date
+    var filmType: String  // "135" or "120"
+    var film: String
+    var camera: String
+    var lens: String
+    var developer: String
+    var notes: String
+
+    init(name: String = "", filmType: String = "135", film: String = "",
+         camera: String = "", lens: String = "", developer: String = "", notes: String = "") {
+        self.id = UUID()
+        self.name = name
+        self.date = Date()
+        self.filmType = filmType
+        self.film = film
+        self.camera = camera
+        self.lens = lens
+        self.developer = developer
+        self.notes = notes
+    }
+}
+
+@Model
 class Print {
     var id: UUID
     var name: String = ""
@@ -70,6 +100,7 @@ class Print {
     var createdAt: Date
     var photoData: Data?
     var session: Session?
+    var filmRoll: FilmRoll?
 
     var exposureTimes: [Int] {
         get { exposureTimesData.split(separator: ",").compactMap { Int($0) } }

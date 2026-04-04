@@ -1,46 +1,28 @@
 import SwiftUI
 import SwiftData
 
-// MARK: - Library (manage reference lists)
+// MARK: - Library root (category list)
 
 struct EquipmentLibraryView: View {
-    @Environment(\.modelContext) private var context
     @Query private var allEquipment: [Equipment]
 
-    @State private var addingType: EquipmentType?
-    @State private var newName = ""
-    @State private var editingItem: Equipment?
-    @State private var editName = ""
-
-    private func items(for type: EquipmentType) -> [Equipment] {
-        allEquipment.filter { $0.category == type.rawValue }.sorted { $0.name < $1.name }
+    private func count(for type: EquipmentType) -> Int {
+        allEquipment.filter { $0.category == type.rawValue }.count
     }
 
     var body: some View {
         List {
             ForEach(EquipmentType.allCases, id: \.rawValue) { type in
-                Section(type.pluralLabel) {
-                    ForEach(items(for: type)) { item in
-                        Text(item.name)
-                            .swipeActions(edge: .leading) {
-                                Button {
-                                    editingItem = item
-                                    editName = item.name
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-                                .tint(.blue)
-                            }
-                    }
-                    .onDelete { offsets in
-                        let list = items(for: type)
-                        for i in offsets { context.delete(list[i]) }
-                    }
-
-                    Button {
-                        addingType = type
-                    } label: {
-                        Label("Add \(type.label)", systemImage: "plus")
+                NavigationLink(destination: EquipmentCategoryView(type: type)) {
+                    HStack {
+                        Text(type.pluralLabel)
+                        Spacer()
+                        let n = count(for: type)
+                        if n > 0 {
+                            Text("\(n)")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -48,35 +30,76 @@ struct EquipmentLibraryView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Equipment")
         .navigationBarTitleDisplayMode(.large)
-        .alert(
-            "New \(addingType?.label ?? "")",
-            isPresented: Binding(
-                get: { addingType != nil },
-                set: { if !$0 { addingType = nil } }
-            )
-        ) {
+    }
+}
+
+// MARK: - Category detail (items list)
+
+struct EquipmentCategoryView: View {
+    let type: EquipmentType
+    @Environment(\.modelContext) private var context
+    @Query private var allEquipment: [Equipment]
+
+    @State private var newName = ""
+    @State private var showingAdd = false
+    @State private var editingItem: Equipment?
+    @State private var editName = ""
+
+    private var items: [Equipment] {
+        allEquipment.filter { $0.category == type.rawValue }.sorted { $0.name < $1.name }
+    }
+
+    var body: some View {
+        List {
+            ForEach(items) { item in
+                Text(item.name)
+                    .swipeActions(edge: .leading) {
+                        Button {
+                            editingItem = item
+                            editName = item.name
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        .tint(.blue)
+                    }
+            }
+            .onDelete { offsets in
+                let list = items
+                for i in offsets { context.delete(list[i]) }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle(type.pluralLabel)
+        .navigationBarTitleDisplayMode(.large)
+        .overlay {
+            if items.isEmpty {
+                ContentUnavailableView(
+                    "No \(type.pluralLabel)",
+                    systemImage: "tray",
+                    description: Text("Tap + to add your first item.")
+                )
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { showingAdd = true } label: {
+                    Image(systemName: "plus")
+                }
+            }
+        }
+        .alert("New \(type.label)", isPresented: $showingAdd) {
             TextField("Name", text: $newName)
             Button("Add") {
-                guard let type = addingType,
-                      !newName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                context.insert(Equipment(
-                    name: newName.trimmingCharacters(in: .whitespaces),
-                    equipmentType: type
-                ))
+                let trimmed = newName.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.isEmpty else { return }
+                context.insert(Equipment(name: trimmed, equipmentType: type))
                 newName = ""
-                addingType = nil
             }
-            Button("Cancel", role: .cancel) {
-                newName = ""
-                addingType = nil
-            }
+            Button("Cancel", role: .cancel) { newName = "" }
         }
         .alert(
             "Edit \(editingItem?.name ?? "")",
-            isPresented: Binding(
-                get: { editingItem != nil },
-                set: { if !$0 { editingItem = nil } }
-            )
+            isPresented: Binding(get: { editingItem != nil }, set: { if !$0 { editingItem = nil } })
         ) {
             TextField("Name", text: $editName)
             Button("Save") {

@@ -7,7 +7,20 @@ struct SessionListView: View {
     @Query(sort: \Session.date, order: .reverse) private var sessions: [Session]
     @State private var showNewSession = false
     @State private var washTimers: [WashTimer] = []
+    @State private var searchText = ""
     private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    private var filteredSessions: [Session] {
+        guard !searchText.isEmpty else { return sessions }
+        let q = searchText.lowercased()
+        return sessions.filter {
+            $0.name.lowercased().contains(q) ||
+            $0.enlarger.lowercased().contains(q) ||
+            $0.lens.lowercased().contains(q) ||
+            $0.paper.lowercased().contains(q) ||
+            $0.developer.lowercased().contains(q)
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -38,13 +51,14 @@ struct SessionListView: View {
                     }
                 }
 
-                ForEach(sessions) { session in
+                ForEach(filteredSessions) { session in
                     NavigationLink(destination: SessionDetailView(session: session)) {
                         SessionRowView(session: session)
                     }
                 }
                 .onDelete(perform: deleteSessions)
             }
+            .searchable(text: $searchText, prompt: "Name, paper, developer…")
             .listStyle(.insetGrouped)
             .navigationTitle("Darkroom")
             .toolbar {
@@ -68,11 +82,11 @@ struct SessionListView: View {
                         Image(systemName: "timer")
                     }
                 }
-                ToolbarItem(placement: .bottomBar) {
+                ToolbarItem(placement: .primaryAction) {
                     Button {
                         showNewSession = true
                     } label: {
-                        Label("New Session", systemImage: "plus")
+                        Image(systemName: "plus")
                     }
                 }
             }
@@ -97,7 +111,7 @@ struct SessionListView: View {
 
     private func deleteSessions(at offsets: IndexSet) {
         for index in offsets {
-            context.delete(sessions[index])
+            context.delete(filteredSessions[index])
         }
     }
 }

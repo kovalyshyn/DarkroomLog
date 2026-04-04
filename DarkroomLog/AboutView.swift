@@ -23,7 +23,7 @@ struct AboutView: View {
             .listRowBackground(Color.clear)
 
             Section("About") {
-                Text("DarkroomLog is an independent app for analog darkroom photographers — log your printing sessions, track exposure times, and keep notes on every print.")
+                Text("DarkroomLog helps analog photographers log darkroom sessions, track exposure times, catalog film rolls, and keep notes on every print.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 4)
@@ -31,10 +31,15 @@ struct AboutView: View {
 
             Section("Developer") {
                 LabeledContent("Author", value: "Vitalii Kovalyshyn")
-                LabeledContent("Year", value: "2026")
                 Link(destination: URL(string: "https://filmly.co.ua")!) {
                     LabeledContent("Community") {
                         Text("filmly.co.ua")
+                            .foregroundStyle(.blue)
+                    }
+                }
+                Link(destination: URL(string: "https://github.com/kovalyshyn/DarkroomLog")!) {
+                    LabeledContent("Source Code") {
+                        Text("github.com")
                             .foregroundStyle(.blue)
                     }
                 }
