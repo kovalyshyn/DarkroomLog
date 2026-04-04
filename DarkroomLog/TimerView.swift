@@ -143,6 +143,7 @@ struct TimerView: View {
             elapsed += 1
             playTick()
             checkIntervalBell()
+            checkMinuteBell()
         }
     }
 
@@ -155,6 +156,7 @@ struct TimerView: View {
             elapsed += 1
             playTick()
             checkIntervalBell()
+            checkMinuteBell()
         }
     }
 
@@ -177,6 +179,13 @@ struct TimerView: View {
                 stopTimer()
             }
         }
+    }
+
+    // MARK: - Minute bell (film development timer only)
+
+    private func checkMinuteBell() {
+        guard !darkroomMode, elapsed > 0, elapsed % 60 == 0 else { return }
+        playBell()
     }
 
     // MARK: - Audio
