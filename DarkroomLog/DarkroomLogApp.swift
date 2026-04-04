@@ -1,8 +1,24 @@
 import SwiftUI
 import SwiftData
 
+@Observable
+private final class AppModel {
+    let container: ModelContainer
+
+    init() {
+        let schema = Schema([Session.self, Print.self, Equipment.self, FilmRoll.self])
+        do {
+            container = try ModelContainer(for: schema, migrationPlan: AppMigrationPlan.self)
+        } catch {
+            container = try! ModelContainer(for: schema)
+        }
+    }
+}
+
 @main
 struct DarkroomLogApp: App {
+    @State private var appModel = AppModel()
+
     init() {
         _ = NotificationManager.shared
     }
@@ -18,6 +34,6 @@ struct DarkroomLogApp: App {
                 }
             }
         }
-        .modelContainer(for: [Session.self, Print.self, Equipment.self, FilmRoll.self])
+        .modelContainer(appModel.container)
     }
 }
