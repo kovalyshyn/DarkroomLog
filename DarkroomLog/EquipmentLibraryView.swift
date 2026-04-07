@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 // MARK: - Library root (category list)
 
@@ -53,6 +54,19 @@ struct EquipmentCategoryView: View {
         List {
             ForEach(items) { item in
                 Text(item.name)
+                    .contextMenu {
+                        Button {
+                            UIPasteboard.general.string = item.name
+                        } label: {
+                            Label("Copy", systemImage: "doc.on.doc")
+                        }
+                        Button {
+                            editingItem = item
+                            editName = item.name
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                    }
                     .swipeActions(edge: .leading) {
                         Button {
                             editingItem = item

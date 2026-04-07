@@ -19,6 +19,7 @@ struct TimerView: View {
     @State private var originalBrightness: CGFloat = UIApplication.shared.connectedScenes
         .compactMap { $0 as? UIWindowScene }.first?.screen.brightness ?? 0.5
     @State private var nextTargetIndex: Int = 0
+    @State private var skipIntervals: Bool = false
 
     @AppStorage("metronomeEnabled") private var metronomeEnabled: Bool = true
 
@@ -42,7 +43,7 @@ struct TimerView: View {
             VStack(spacing: 0) {
                 Spacer()
 
-                if !intervals.isEmpty && isRunning {
+                if !intervals.isEmpty && isRunning && !skipIntervals {
                     Text("Step \(min(nextTargetIndex + 1, intervals.count)) of \(intervals.count)")
                         .font(.system(size: 14, weight: .regular))
                         .foregroundStyle(darkroomMode ? Color(red: 0.4, green: 0, blue: 0) : Color.white.opacity(0.5))
@@ -59,7 +60,22 @@ struct TimerView: View {
 
                 Spacer()
 
-                Text(isRunning ? "tap · knock · toss to restart" : "tap to start")
+                if let onStop {
+                    Button("Use this time") { onStop(elapsed) }
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundStyle(isRunning || elapsed > 0
+                            ? Color(red: 0.7, green: 0.2, blue: 0.2)
+                            : Color(red: 0.3, green: 0.05, blue: 0.05))
+                        .disabled(!isRunning && elapsed == 0)
+                        .padding(.bottom, 16)
+                }
+
+                let hintText: String = {
+                    if isRunning { return "tap · knock · toss to restart" }
+                    if skipIntervals && !intervals.isEmpty { return "tap to continue free" }
+                    return "tap to start"
+                }()
+                Text(hintText)
                     .font(.system(size: 13, weight: .regular))
                     .foregroundStyle(darkroomMode ? Color(red: 0.3, green: 0.05, blue: 0.05) : Color.white.opacity(0.3))
                     .padding(.bottom, 48)
@@ -76,25 +92,9 @@ struct TimerView: View {
                     }
                 }
         )
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text("Timer")
-                    .foregroundStyle(darkroomMode ? Color(red: 0.4, green: 0.1, blue: 0.1) : Color.white.opacity(0.6))
-                    .font(.subheadline)
-            }
-            if onStop != nil {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Use this time") {
-                        onStop?(elapsed)
-                    }
-                    .foregroundStyle(Color(red: 0.7, green: 0.2, blue: 0.2))
-                    .disabled(!isRunning && elapsed == 0)
-                }
-            }
-        }
+        .ignoresSafeArea(edges: .top)
         .onAppear {
             setupAudio()
             startMotionDetection()
@@ -106,8 +106,7 @@ struct TimerView: View {
             UIApplication.shared.isIdleTimerDisabled = false
         }
         .preferredColorScheme(.dark)
-        .statusBarHidden(isRunning)
-        .toolbar(isRunning ? .hidden : .visible, for: .navigationBar)
+        .statusBarHidden(true)
     }
 
     private var formattedTime: String {
@@ -152,6 +151,7 @@ struct TimerView: View {
         timer?.invalidate()
         elapsed = 0
         nextTargetIndex = 0
+        skipIntervals = false
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             elapsed += 1
             playTick()
@@ -170,12 +170,14 @@ struct TimerView: View {
     // MARK: - Interval bells
 
     private func checkIntervalBell() {
+        guard !skipIntervals else { return }
         let targets = cumulativeTargets
         guard nextTargetIndex < targets.count else { return }
         if elapsed == targets[nextTargetIndex] {
             playBell()
             nextTargetIndex += 1
             if nextTargetIndex >= targets.count {
+                skipIntervals = true
                 stopTimer()
             }
         }
@@ -241,13 +243,13 @@ struct TimerView: View {
                 if inFreefall {
                     inFreefall = false
                     let duration = Date().timeIntervalSince(freefallStart)
-                    if duration > 0.08 && magnitude > 1.5 {
+                    if duration > 0.04 && magnitude > 1.2 {
                         triggerRestart()
                     }
                 }
             }
 
-            if magnitude > 2.2 {
+            if magnitude > 1.7 {
                 triggerRestart()
             }
         }

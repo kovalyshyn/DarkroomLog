@@ -192,19 +192,26 @@ struct PrintDetailView: View {
             }
 
             Section("Film Roll") {
-                Button {
-                    pickingRoll = true
-                } label: {
-                    HStack {
-                        Text(print.filmRoll.map { rollLabel($0) } ?? "None")
-                            .foregroundStyle(print.filmRoll == nil ? .secondary : .primary)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+                if let roll = print.filmRoll {
+                    NavigationLink(destination: FilmRollDetailView(roll: roll)) {
+                        Text(rollLabel(roll))
                     }
+                    Button("Change roll…") { pickingRoll = true }
+                        .foregroundStyle(.secondary)
+                } else {
+                    Button {
+                        pickingRoll = true
+                    } label: {
+                        HStack {
+                            Text("None").foregroundStyle(.secondary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
                 }
-                .foregroundStyle(.primary)
             }
 
             Section("Photo") {

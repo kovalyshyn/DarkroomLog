@@ -33,6 +33,14 @@ struct SessionDetailView: View {
                     NavigationLink(destination: PrintDetailView(print: print)) {
                         PrintRowView(print: print)
                     }
+                    .swipeActions(edge: .leading) {
+                        Button {
+                            duplicatePrint(print)
+                        } label: {
+                            Label("Duplicate", systemImage: "plus.square.on.square")
+                        }
+                        .tint(.indigo)
+                    }
                 }
                 .onDelete(perform: deletePrints)
 
@@ -80,6 +88,15 @@ struct SessionDetailView: View {
         for index in offsets {
             context.delete(sorted[index])
         }
+    }
+
+    private func duplicatePrint(_ original: Print) {
+        let copy = Print(exposureTimes: original.exposureTimes, notes: original.notes)
+        copy.name = original.name
+        copy.filmRoll = original.filmRoll
+        copy.session = session
+        session.prints.append(copy)
+        context.insert(copy)
     }
 }
 

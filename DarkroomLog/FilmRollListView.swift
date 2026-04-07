@@ -6,7 +6,6 @@ struct FilmRollListView: View {
     @Query(sort: \FilmRoll.date, order: .reverse) private var rolls: [FilmRoll]
 
     @State private var showAdd = false
-    @State private var editingRoll: FilmRoll? = nil
     @State private var searchText = ""
 
     private var filteredRolls: [FilmRoll] {
@@ -24,12 +23,9 @@ struct FilmRollListView: View {
         NavigationStack {
             List {
                 ForEach(filteredRolls) { roll in
-                    Button {
-                        editingRoll = roll
-                    } label: {
+                    NavigationLink(destination: FilmRollDetailView(roll: roll)) {
                         FilmRollRow(roll: roll)
                     }
-                    .tint(.primary)
                 }
                 .onDelete(perform: deleteRolls)
             }
@@ -75,9 +71,6 @@ struct FilmRollListView: View {
         .sheet(isPresented: $showAdd) {
             FilmRollFormView()
         }
-        .sheet(item: $editingRoll) { roll in
-            FilmRollFormView(roll: roll)
-        }
     }
 
     private func deleteRolls(at offsets: IndexSet) {
@@ -121,6 +114,84 @@ struct FilmRollRow: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 2)
+    }
+}
+
+// MARK: - Film Roll Detail
+
+struct FilmRollDetailView: View {
+    @Bindable var roll: FilmRoll
+    @Environment(\.modelContext) private var context
+    @Query private var allPrints: [Print]
+
+    @State private var editingRoll = false
+
+    private var linkedPrints: [Print] {
+        allPrints
+            .filter { $0.filmRoll?.id == roll.id }
+            .sorted { $0.createdAt < $1.createdAt }
+    }
+
+    var body: some View {
+        Form {
+            Section("Roll") {
+                LabeledContent("Format", value: roll.filmType)
+                LabeledContent("Date", value: roll.date.formatted(date: .abbreviated, time: .omitted))
+            }
+
+            if !roll.film.isEmpty || !roll.developer.isEmpty || !roll.camera.isEmpty || !roll.lens.isEmpty {
+                Section("Film") {
+                    if !roll.film.isEmpty     { LabeledContent("Film Stock", value: roll.film) }
+                    if !roll.developer.isEmpty { LabeledContent("Developer",  value: roll.developer) }
+                    if !roll.camera.isEmpty   { LabeledContent("Camera",     value: roll.camera) }
+                    if !roll.lens.isEmpty     { LabeledContent("Lens",       value: roll.lens) }
+                }
+            }
+
+            if !roll.notes.isEmpty {
+                Section("Notes") {
+                    Text(roll.notes)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section("Prints (\(linkedPrints.count))") {
+                if linkedPrints.isEmpty {
+                    Text("No prints linked to this roll")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(linkedPrints) { p in
+                        NavigationLink(destination: PrintDetailView(print: p)) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                let times = p.exposureTimes
+                                let timeStr = times.isEmpty ? "\(p.exposureSeconds)s" : times.map { "\($0)s" }.joined(separator: " · ")
+                                Text(p.name.isEmpty ? timeStr : p.name)
+                                    .font(.body)
+                                HStack(spacing: 6) {
+                                    if !p.name.isEmpty {
+                                        Text(timeStr)
+                                    }
+                                    if let session = p.session, !session.name.isEmpty {
+                                        Text("·")
+                                        Text(session.name)
+                                    }
+                                }
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle(roll.name.isEmpty ? (roll.film.isEmpty ? "Roll" : roll.film) : roll.name)
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            Button("Edit") { editingRoll = true }
+        }
+        .sheet(isPresented: $editingRoll) {
+            FilmRollFormView(roll: roll)
+        }
     }
 }
 
