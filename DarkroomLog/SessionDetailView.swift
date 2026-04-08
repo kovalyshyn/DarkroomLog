@@ -93,6 +93,8 @@ struct SessionDetailView: View {
     private func duplicatePrint(_ original: Print) {
         let copy = Print(exposureTimes: original.exposureTimes, notes: original.notes)
         copy.name = original.name
+        copy.aperture = original.aperture
+        copy.rating = original.rating
         copy.filmRoll = original.filmRoll
         copy.session = session
         session.prints.append(copy)
@@ -126,8 +128,20 @@ struct PrintRowView: View {
             VStack(alignment: .leading, spacing: 4) {
                 let times = print.exposureTimes
                 let timeStr = times.isEmpty ? "\(print.exposureSeconds) sec" : times.map { "\($0)s" }.joined(separator: " · ")
-                Text(print.name.isEmpty ? timeStr : print.name)
-                    .font(.headline)
+                HStack {
+                    Text(print.name.isEmpty ? timeStr : print.name)
+                        .font(.headline)
+                    Spacer()
+                    if print.rating > 0 {
+                        HStack(spacing: 2) {
+                            ForEach(1...3, id: \.self) { star in
+                                Image(systemName: star <= print.rating ? "star.fill" : "star")
+                                    .foregroundStyle(star <= print.rating ? Color.yellow : Color.clear)
+                                    .font(.system(size: 10))
+                            }
+                        }
+                    }
+                }
                 if !print.name.isEmpty {
                     Text(timeStr)
                         .font(.caption)

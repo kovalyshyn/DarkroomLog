@@ -6,11 +6,10 @@ private final class AppModel {
     let container: ModelContainer
 
     init() {
-        let schema = Schema([Session.self, Print.self, Equipment.self, FilmRoll.self])
         do {
-            container = try ModelContainer(for: schema, migrationPlan: AppMigrationPlan.self)
+            container = try ModelContainer(for: Session.self, Print.self, Equipment.self, FilmRoll.self)
         } catch {
-            container = try! ModelContainer(for: schema)
+            fatalError("Failed to create ModelContainer: \(error)")
         }
     }
 }
@@ -18,6 +17,7 @@ private final class AppModel {
 @main
 struct DarkroomLogApp: App {
     @State private var appModel = AppModel()
+    @AppStorage("forceDarkMode") private var forceDarkMode: Bool = false
 
     init() {
         _ = NotificationManager.shared
@@ -33,6 +33,7 @@ struct DarkroomLogApp: App {
                     FilmRollListView()
                 }
             }
+            .preferredColorScheme(forceDarkMode ? .dark : nil)
         }
         .modelContainer(appModel.container)
     }

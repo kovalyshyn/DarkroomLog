@@ -96,7 +96,9 @@ class Print {
     var name: String = ""
     var exposureSeconds: Int   // kept for migration from v1.0
     var exposureTimesData: String = ""
+    var aperture: String = ""
     var notes: String
+    var rating: Int = 0        // 0 = unrated, 1–3 stars
     var createdAt: Date
     var photoData: Data?
     var session: Session?

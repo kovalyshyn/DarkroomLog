@@ -45,7 +45,9 @@ struct PrintRecord: Codable {
     let name: String
     let exposureSeconds: Int
     let exposureTimesData: String
+    let aperture: String
     let notes: String
+    let rating: Int
     let createdAt: Date
     let photoData: Data?
     let filmRollId: UUID?
@@ -55,11 +57,11 @@ struct PrintRecord: Codable {
 
 enum BackupManager {
 
-    static func export(
+    static func exportData(
         sessions: [Session],
         equipment: [Equipment],
         filmRolls: [FilmRoll]
-    ) throws -> URL {
+    ) throws -> Data {
         let backup = BackupData(
             version: 1,
             exportedAt: Date(),
@@ -84,7 +86,9 @@ enum BackupManager {
                             id: p.id, name: p.name,
                             exposureSeconds: p.exposureSeconds,
                             exposureTimesData: p.exposureTimesData,
-                            notes: p.notes, createdAt: p.createdAt,
+                            aperture: p.aperture,
+                            notes: p.notes, rating: p.rating,
+                            createdAt: p.createdAt,
                             photoData: p.photoData,
                             filmRollId: p.filmRoll?.id
                         )
@@ -96,15 +100,7 @@ enum BackupManager {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = .prettyPrinted
-        let json = try encoder.encode(backup)
-
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let dateStr = formatter.string(from: Date())
-        let filename = "DarkroomLog-\(dateStr).json"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
-        try json.write(to: url, options: .atomic)
-        return url
+        return try encoder.encode(backup)
     }
 
     static func restore(from url: URL, context: ModelContext) throws {
@@ -155,6 +151,8 @@ enum BackupManager {
                 p.name = pRec.name
                 p.exposureSeconds = pRec.exposureSeconds
                 p.exposureTimesData = pRec.exposureTimesData
+                p.aperture = pRec.aperture
+                p.rating = pRec.rating
                 p.createdAt = pRec.createdAt
                 p.photoData = pRec.photoData
                 p.session = session

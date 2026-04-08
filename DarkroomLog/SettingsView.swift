@@ -2,16 +2,40 @@ import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
 
+// MARK: - Backup file document
+
+struct BackupFileDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.json] }
+    let data: Data
+
+    init(data: Data) { self.data = data }
+
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        self.data = data
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: data)
+    }
+}
+
+// MARK: - Settings view
+
 struct SettingsView: View {
     @AppStorage("metronomeEnabled") private var metronomeEnabled: Bool = true
+    @AppStorage("forceDarkMode") private var forceDarkMode: Bool = false
 
     @Environment(\.modelContext) private var context
     @Query private var sessions: [Session]
     @Query private var equipment: [Equipment]
     @Query private var filmRolls: [FilmRoll]
 
-    @State private var showingExportSheet = false
-    @State private var exportURL: URL?
+    @State private var exportDocument: BackupFileDocument?
+    @State private var exportFilename = "DarkroomLog-backup.json"
+    @State private var showingExporter = false
     @State private var showingImporter = false
     @State private var pendingRestoreURL: URL?
     @State private var showRestoreConfirm = false
@@ -20,6 +44,10 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section("Appearance") {
+                Toggle("Always Dark Interface", isOn: $forceDarkMode)
+            }
+
             Section("Timer") {
                 Toggle("Metronome", isOn: $metronomeEnabled)
             }
@@ -33,12 +61,16 @@ struct SettingsView: View {
             Section {
                 Button {
                     do {
-                        exportURL = try BackupManager.export(
+                        let data = try BackupManager.exportData(
                             sessions: sessions,
                             equipment: equipment,
                             filmRolls: filmRolls
                         )
-                        showingExportSheet = true
+                        let formatter = DateFormatter()
+                        formatter.dateFormat = "yyyy-MM-dd"
+                        exportFilename = "DarkroomLog-\(formatter.string(from: Date())).json"
+                        exportDocument = BackupFileDocument(data: data)
+                        showingExporter = true
                     } catch {
                         alertMessage = "Export failed: \(error.localizedDescription)"
                         showAlert = true
@@ -62,9 +94,15 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showingExportSheet) {
-            if let url = exportURL {
-                ShareSheet(url: url)
+        .fileExporter(
+            isPresented: $showingExporter,
+            document: exportDocument,
+            contentType: .json,
+            defaultFilename: exportFilename
+        ) { result in
+            if case .failure(let error) = result {
+                alertMessage = "Export failed: \(error.localizedDescription)"
+                showAlert = true
             }
         }
         .fileImporter(
@@ -108,16 +146,4 @@ struct SettingsView: View {
             Text(alertMessage ?? "")
         }
     }
-}
-
-// MARK: - Share sheet wrapper
-
-struct ShareSheet: UIViewControllerRepresentable {
-    let url: URL
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: [url], applicationActivities: nil)
-    }
-
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

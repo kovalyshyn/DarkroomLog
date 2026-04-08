@@ -12,6 +12,8 @@ struct AddPrintView: View {
     @State private var selectedRoll: FilmRoll? = nil
     @State private var pickingRoll = false
     @State private var exposureTimes: [Int] = [10]
+    @State private var aperture: String = ""
+    @State private var rating: Int = 0
     @State private var notes: String = ""
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var photoData: Data?
@@ -21,9 +23,39 @@ struct AddPrintView: View {
             Form {
                 Section("Print") {
                     TextField("Name (optional)", text: $printName)
+                    HStack {
+                        Text("Rating")
+                        Spacer()
+                        StarRatingView(rating: $rating)
+                    }
+                }
+
+                Section("Film Roll") {
+                    Button {
+                        pickingRoll = true
+                    } label: {
+                        HStack {
+                            Text(selectedRoll.map { rollLabel($0) } ?? "None")
+                                .foregroundStyle(selectedRoll == nil ? .secondary : .primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
                 }
 
                 Section("Exposure") {
+                    HStack {
+                        Text("Aperture")
+                        Spacer()
+                        TextField("f/8", text: $aperture)
+                            .multilineTextAlignment(.trailing)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 80)
+                    }
+
                     ForEach(exposureTimes.indices, id: \.self) { i in
                         HStack {
                             Text("Step \(i + 1)")
@@ -44,22 +76,6 @@ struct AddPrintView: View {
                 Section("Notes") {
                     TextField("Dodging, burning, grade, observations...", text: $notes, axis: .vertical)
                         .lineLimit(4...8)
-                }
-
-                Section("Film Roll") {
-                    Button {
-                        pickingRoll = true
-                    } label: {
-                        HStack {
-                            Text(selectedRoll.map { rollLabel($0) } ?? "None")
-                                .foregroundStyle(selectedRoll == nil ? .secondary : .primary)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                    .foregroundStyle(.primary)
                 }
 
                 Section("Photo") {
@@ -112,6 +128,8 @@ struct AddPrintView: View {
     private func save() {
         let newPrint = Print(exposureTimes: exposureTimes, notes: notes.trimmingCharacters(in: .whitespaces))
         newPrint.name = printName.trimmingCharacters(in: .whitespaces)
+        newPrint.aperture = aperture.trimmingCharacters(in: .whitespaces)
+        newPrint.rating = rating
         newPrint.photoData = photoData
         newPrint.filmRoll = selectedRoll
         newPrint.session = session
@@ -137,9 +155,46 @@ struct PrintDetailView: View {
         Form {
             Section("Print") {
                 TextField("Name (optional)", text: $print.name)
+                HStack {
+                    Text("Rating")
+                    Spacer()
+                    StarRatingView(rating: $print.rating)
+                }
+            }
+
+            Section("Film Roll") {
+                if let roll = print.filmRoll {
+                    NavigationLink(destination: FilmRollDetailView(roll: roll)) {
+                        Text(rollLabel(roll))
+                    }
+                    Button("Change roll…") { pickingRoll = true }
+                        .foregroundStyle(.secondary)
+                } else {
+                    Button {
+                        pickingRoll = true
+                    } label: {
+                        HStack {
+                            Text("None").foregroundStyle(.secondary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+                }
             }
 
             Section("Exposure") {
+                HStack {
+                    Text("Aperture")
+                    Spacer()
+                    TextField("f/8", text: $print.aperture)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 80)
+                }
+
                 ForEach(times.indices, id: \.self) { i in
                     HStack {
                         Text("Step \(i + 1)")
@@ -191,29 +246,6 @@ struct PrintDetailView: View {
                     .lineLimit(4...10)
             }
 
-            Section("Film Roll") {
-                if let roll = print.filmRoll {
-                    NavigationLink(destination: FilmRollDetailView(roll: roll)) {
-                        Text(rollLabel(roll))
-                    }
-                    Button("Change roll…") { pickingRoll = true }
-                        .foregroundStyle(.secondary)
-                } else {
-                    Button {
-                        pickingRoll = true
-                    } label: {
-                        HStack {
-                            Text("None").foregroundStyle(.secondary)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                    .foregroundStyle(.primary)
-                }
-            }
-
             Section("Photo") {
                 if let data = print.photoData, let uiImage = UIImage(data: data) {
                     Button {
@@ -261,6 +293,7 @@ struct PrintDetailView: View {
         }
         .onDisappear {
             print.name = print.name.trimmingCharacters(in: .whitespaces)
+            print.aperture = print.aperture.trimmingCharacters(in: .whitespaces)
             print.notes = print.notes.trimmingCharacters(in: .whitespaces)
         }
         .onReceive(ticker) { date in
@@ -354,6 +387,23 @@ struct EditSessionView: View {
             .sheet(isPresented: $pickingPaper)     { EquipmentPickerView(type: .paper,     selection: $session.paper) }
             .sheet(isPresented: $pickingDeveloper) { EquipmentPickerView(type: .developer, selection: $session.developer) }
         }
+    }
+}
+
+// MARK: - Star rating
+
+struct StarRatingView: View {
+    @Binding var rating: Int
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(1...3, id: \.self) { star in
+                Image(systemName: star <= rating ? "star.fill" : "star")
+                    .foregroundStyle(star <= rating ? Color.yellow : Color.secondary)
+                    .onTapGesture { rating = (rating == star) ? 0 : star }
+            }
+        }
+        .font(.system(size: 20))
     }
 }
 
