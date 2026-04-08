@@ -275,19 +275,21 @@ struct FilmRollFormView: View {
     }
 
     private func save() {
+        let trimName  = name.trimmingCharacters(in: .whitespaces)
+        let trimNotes = notes.trimmingCharacters(in: .whitespaces)
         if let r = roll {
-            r.name = name
+            r.name = trimName
             r.date = date
             r.filmType = filmType
             r.film = film
             r.developer = developer
             r.camera = camera
             r.lens = lens
-            r.notes = notes
+            r.notes = trimNotes
         } else {
             let r = FilmRoll(
-                name: name, filmType: filmType, film: film,
-                camera: camera, lens: lens, developer: developer, notes: notes
+                name: trimName, filmType: filmType, film: film,
+                camera: camera, lens: lens, developer: developer, notes: trimNotes
             )
             r.date = date
             context.insert(r)

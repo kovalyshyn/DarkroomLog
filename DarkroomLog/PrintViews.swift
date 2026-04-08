@@ -110,8 +110,8 @@ struct AddPrintView: View {
     }
 
     private func save() {
-        let newPrint = Print(exposureTimes: exposureTimes, notes: notes)
-        newPrint.name = printName
+        let newPrint = Print(exposureTimes: exposureTimes, notes: notes.trimmingCharacters(in: .whitespaces))
+        newPrint.name = printName.trimmingCharacters(in: .whitespaces)
         newPrint.photoData = photoData
         newPrint.filmRoll = selectedRoll
         newPrint.session = session
@@ -259,6 +259,10 @@ struct PrintDetailView: View {
             print.exposureTimes = newTimes
             print.exposureSeconds = newTimes.first ?? 0
         }
+        .onDisappear {
+            print.name = print.name.trimmingCharacters(in: .whitespaces)
+            print.notes = print.notes.trimmingCharacters(in: .whitespaces)
+        }
         .onReceive(ticker) { date in
             now = date
             activeWashTimer = NotificationManager.shared.activeTimer(for: print.id.uuidString)
@@ -338,7 +342,11 @@ struct EditSessionView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button("Done") {
+                        session.name = session.name.trimmingCharacters(in: .whitespaces)
+                        session.comment = session.comment.trimmingCharacters(in: .whitespaces)
+                        dismiss()
+                    }
                 }
             }
             .sheet(isPresented: $pickingEnlarger)  { EquipmentPickerView(type: .enlarger,  selection: $session.enlarger) }

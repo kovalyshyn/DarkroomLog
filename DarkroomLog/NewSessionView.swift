@@ -56,12 +56,12 @@ struct NewSessionView: View {
 
     private func save() {
         context.insert(Session(
-            name: name,
+            name: name.trimmingCharacters(in: .whitespaces),
             enlarger: enlarger,
             lens: lens,
             paper: paper,
             developer: developer,
-            comment: comment
+            comment: comment.trimmingCharacters(in: .whitespaces)
         ))
         dismiss()
     }
