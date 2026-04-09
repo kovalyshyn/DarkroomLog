@@ -1,14 +1,16 @@
 # DarkroomLog
 
-An iOS app for analog darkroom photographers. Log printing sessions, catalog film rolls, and keep notes on every print.
+An iOS app for analog darkroom photographers. Log printing sessions, catalog film rolls, share your work, and keep notes on every print.
 
 ## Features
 
 ### Darkroom
 - **Session logging** — record enlarger, lens, paper, and developer for each session
-- **Print tracking** — log exposure steps, notes, and attach a photo of each print
+- **Print tracking** — log exposure steps, aperture, notes, and attach a photo of each print
+- **Print rating** — rate prints with 1–3 stars
+- **Duplicate print** — swipe right on any print to duplicate it with all settings
 - **Darkroom timer** — red digits on black, screen dims to minimum, shake or knock to restart
-- **Wash timer** — background countdown with Time Sensitive notification when done; multiple timers at once
+- **Wash timer** — background countdown with Time Sensitive notification when done
 - **Equipment library** — save your gear once, pick it every time; categories: Enlargers, Cameras, Film Stocks, Lenses, Papers, Developers
 
 ### Light Table
@@ -16,9 +18,15 @@ An iOS app for analog darkroom photographers. Log printing sessions, catalog fil
 - **Film roll picker** — link prints to specific rolls from the Light Table
 - **Searchable lists** — find sessions and rolls instantly
 
+### Share
+- **Print cards** — generate a dark-themed image card with photo, name, rating, film roll, equipment, and exposure; choose portrait or landscape layout
+- **Film roll cards** — share the full development record of any roll as an image card
+- Save to Photos or share to any app directly from the preview sheet
+
 ### General
+- **Backup & Restore** — export all data (sessions, prints, film rolls, equipment, photos) as JSON; restore on any device
+- **Dark interface** — force dark mode independently of system appearance
 - **Two timers** — darkroom timer (red, screen dimmed) and film development timer (white, normal brightness)
-- **Settings** — toggle metronome tick sound
 - **Search** — full-text search in both Darkroom and Light Table
 
 ## Darkroom Timer
@@ -28,7 +36,7 @@ Designed for use in complete darkness:
 - Screen brightness drops to minimum automatically
 - Status bar and navigation bar hidden while running
 - Tap, knock on the table, or toss the phone to restart from zero
-- Bell sound at each exposure step
+- Bell sound at each exposure step; free-run mode after the last step
 - Swipe right to exit
 
 ## Film Development Timer
@@ -36,12 +44,13 @@ Designed for use in complete darkness:
 A standard timer for use outside the darkroom (developing tank, chemical mixing):
 - White digits on black
 - Normal screen brightness
+- Bell every minute as a reminder
 - Same shake/knock/toss to restart
 
 ## Requirements
 
-- iOS 18.6+
-- Xcode 26+
+- iOS 17.6+
+- Xcode 16+
 
 ## Installation
 
@@ -54,11 +63,12 @@ open DarkroomLog.xcodeproj
 ## Architecture
 
 - **SwiftUI** — declarative UI
-- **SwiftData** — local persistence
+- **SwiftData** — local persistence (automatic lightweight migration)
 - **UserNotifications** — Time Sensitive wash timer notifications
 - **AVFoundation** — tick and bell audio
 - **CoreMotion** — shake and toss detection
 - **PhotosUI** — print photo attachment
+- **WidgetKit** — planned for v1.6
 
 ## About
 
