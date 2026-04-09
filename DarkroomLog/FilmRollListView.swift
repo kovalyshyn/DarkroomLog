@@ -125,6 +125,7 @@ struct FilmRollDetailView: View {
     @Query private var allPrints: [Print]
 
     @State private var editingRoll = false
+    @State private var showSharePreview = false
 
     private var linkedPrints: [Print] {
         allPrints
@@ -141,10 +142,10 @@ struct FilmRollDetailView: View {
 
             if !roll.film.isEmpty || !roll.developer.isEmpty || !roll.camera.isEmpty || !roll.lens.isEmpty {
                 Section("Film") {
-                    if !roll.film.isEmpty     { LabeledContent("Film Stock", value: roll.film) }
+                    if !roll.film.isEmpty      { LabeledContent("Film Stock", value: roll.film) }
                     if !roll.developer.isEmpty { LabeledContent("Developer",  value: roll.developer) }
-                    if !roll.camera.isEmpty   { LabeledContent("Camera",     value: roll.camera) }
-                    if !roll.lens.isEmpty     { LabeledContent("Lens",       value: roll.lens) }
+                    if !roll.camera.isEmpty    { LabeledContent("Camera",     value: roll.camera) }
+                    if !roll.lens.isEmpty      { LabeledContent("Lens",       value: roll.lens) }
                 }
             }
 
@@ -187,11 +188,217 @@ struct FilmRollDetailView: View {
         .navigationTitle(roll.name.isEmpty ? (roll.film.isEmpty ? "Roll" : roll.film) : roll.name)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
-            Button("Edit") { editingRoll = true }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showSharePreview = true
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Edit") { editingRoll = true }
+            }
         }
         .sheet(isPresented: $editingRoll) {
             FilmRollFormView(roll: roll)
         }
+        .sheet(isPresented: $showSharePreview) {
+            FilmRollSharePreviewSheet(roll: roll, printCount: linkedPrints.count)
+        }
+    }
+}
+
+// MARK: - Film Roll Share Card
+
+struct FilmRollShareCardView: View {
+    let roll: FilmRoll
+    let printCount: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header bar
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(roll.name.isEmpty ? (roll.film.isEmpty ? "Film Roll" : roll.film) : roll.name)
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text(roll.date.formatted(date: .long, time: .omitted))
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white.opacity(0.45))
+                }
+                Spacer()
+                Text(roll.filmType)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.1))
+                    .clipShape(Capsule())
+            }
+            .padding(20)
+
+            Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
+
+            VStack(alignment: .leading, spacing: 12) {
+                if !roll.film.isEmpty      { rollRow("film",          "Film Stock", roll.film) }
+                if !roll.developer.isEmpty { rollRow("flask",         "Developer",  roll.developer) }
+                if !roll.camera.isEmpty    { rollRow("camera",        "Camera",     roll.camera) }
+                if !roll.lens.isEmpty      { rollRow("camera.aperture","Lens",      roll.lens) }
+            }
+            .padding(20)
+
+            if !roll.notes.isEmpty {
+                Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("NOTES")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.35))
+                        .tracking(0.8)
+                    Text(roll.notes)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(20)
+            }
+
+            Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
+
+            HStack {
+                Image(systemName: "photo.stack")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.4))
+                Text(printCount == 1 ? "1 print" : "\(printCount) prints")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.7))
+                Spacer()
+                Text("Generated with DarkroomLog")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.white.opacity(0.25))
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+        }
+        .frame(width: 390)
+        .background(Color(white: 0.07))
+    }
+
+    private func rollRow(_ icon: String, _ label: String, _ value: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 13))
+                .foregroundStyle(.white.opacity(0.4))
+                .frame(width: 18)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label.uppercased())
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.35))
+                    .tracking(0.8)
+                Text(value)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+// MARK: - Film Roll Share Preview Sheet
+
+struct FilmRollSharePreviewSheet: View {
+    let roll: FilmRoll
+    let printCount: Int
+    @Environment(\.dismiss) private var dismiss
+    @State private var thumb: UIImage? = nil
+    @State private var shareItems: [Any]? = nil
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                ZStack {
+                    Color(.systemGroupedBackground).ignoresSafeArea()
+                    if let thumb {
+                        Image(uiImage: thumb)
+                            .resizable()
+                            .scaledToFit()
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
+                            .padding(24)
+                    } else {
+                        ProgressView()
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                VStack(spacing: 12) {
+                    Button {
+                        Task { @MainActor in
+                            let renderer = ImageRenderer(
+                                content: FilmRollShareCardView(roll: roll, printCount: printCount)
+                            )
+                            renderer.scale = 3.0
+                            if let img = renderer.uiImage, let url = saveToTemp(img) {
+                                shareItems = [url]
+                            }
+                        }
+                    } label: {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding()
+                .background(.bar)
+            }
+            .navigationTitle("Share Film Roll")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+        .task { await renderThumb() }
+        .sheet(isPresented: .init(
+            get: { shareItems != nil },
+            set: { if !$0 { shareItems = nil } }
+        )) {
+            if let items = shareItems {
+                ActivityViewController(items: items)
+            }
+        }
+    }
+
+    @MainActor
+    private func renderThumb() async {
+        let r = ImageRenderer(content: FilmRollShareCardView(roll: roll, printCount: printCount))
+        r.scale = 1.5
+        thumb = r.uiImage
+    }
+
+    private func saveToTemp(_ image: UIImage) -> URL? {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        let dateStr = df.string(from: roll.date)
+
+        let base = roll.name.isEmpty ? roll.film : roll.name
+        let safeName = base
+            .components(separatedBy: CharacterSet.alphanumerics
+                .union(CharacterSet(charactersIn: " ")).inverted)
+            .joined()
+            .trimmingCharacters(in: .whitespaces)
+            .replacingOccurrences(of: " ", with: "_")
+
+        let filename = safeName.isEmpty
+            ? "\(dateStr)_filmroll.jpg"
+            : "\(dateStr)_\(safeName).jpg"
+
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        guard let data = image.jpegData(compressionQuality: 0.92) else { return nil }
+        try? data.write(to: url, options: .atomic)
+        return url
     }
 }
 

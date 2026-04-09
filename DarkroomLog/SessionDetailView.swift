@@ -148,11 +148,10 @@ struct PrintRowView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if !print.notes.isEmpty {
-                    Text(print.notes)
+                if !print.aperture.isEmpty {
+                    Text(print.aperture)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(2)
                 }
 
                 Text(print.createdAt.formatted(date: .omitted, time: .shortened))
