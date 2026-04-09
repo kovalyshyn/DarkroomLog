@@ -29,7 +29,7 @@ build/
 
 # Generated files
 icon.png
-AppIcon.svg
+icon_dark.png
 
 # CocoaPods
 Pods/
