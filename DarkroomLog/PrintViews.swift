@@ -544,13 +544,8 @@ enum ShareLayout: CaseIterable {
 struct PrintShareCardView: View {
     let print: Print
     var layout: ShareLayout = .portrait
-
-    private var exposureText: String {
-        let times = print.exposureTimes
-        if times.isEmpty { return print.exposureSeconds > 0 ? "\(print.exposureSeconds)s" : "" }
-        if times.count == 1 { return "\(times[0])s" }
-        return times.enumerated().map { "Step \($0.offset + 1): \($0.element)s" }.joined(separator: "  ·  ")
-    }
+    var photoOffset: CGSize = .zero
+    var photoScale: CGFloat = 1.0
 
     var body: some View {
         switch layout {
@@ -605,6 +600,8 @@ struct PrintShareCardView: View {
                         .resizable()
                         .scaledToFill()
                         .frame(width: photoWidth)
+                        .scaleEffect(photoScale)
+                        .offset(x: photoOffset.width, y: photoOffset.height)
                         .clipped()
                 }
                 Color(white: 0.07)
@@ -622,55 +619,38 @@ struct PrintShareCardView: View {
         let gap: CGFloat   = compact ? 10 : 14
 
         VStack(alignment: .leading, spacing: gap) {
-            // Name + stars
-            if !print.name.isEmpty || print.rating > 0 {
-                VStack(alignment: .leading, spacing: 4) {
-                    if !print.name.isEmpty {
-                        Text(print.name)
-                            .font(.system(size: title, weight: .bold))
-                            .foregroundStyle(.white)
-                            .lineLimit(2)
-                    }
-                    if print.rating > 0 {
-                        HStack(spacing: 3) {
-                            ForEach(1...3, id: \.self) { star in
-                                Image(systemName: star <= print.rating ? "star.fill" : "star")
-                                    .font(.system(size: compact ? 10 : 13))
-                                    .foregroundStyle(star <= print.rating ? Color.yellow : Color.white.opacity(0.25))
-                            }
-                        }
-                    }
-                }
+            // Name only (no stars)
+            if !print.name.isEmpty {
+                Text(print.name)
+                    .font(.system(size: title, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
             }
 
             Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
 
-            // Film Roll
-            if let roll = print.filmRoll {
-                let rollName = [roll.name, roll.film, roll.filmType]
-                    .filter { !$0.isEmpty }
-                    .joined(separator: " · ")
-                if !rollName.isEmpty {
-                    row("film", "Film Roll", rollName, body: body, tag: tag, icon: icon)
-                }
-            }
-
-            // Session equipment
+            // Darkroom equipment from session
             let s = print.session
-            Group {
-                if let v = s?.enlarger,  !v.isEmpty { row("viewfinder",   "Enlarger",  v, body: body, tag: tag, icon: icon) }
-                if let v = s?.lens,      !v.isEmpty { row("camera.aperture", "Lens",   v, body: body, tag: tag, icon: icon) }
-                if let v = s?.paper,     !v.isEmpty { row("doc.plaintext", "Paper",    v, body: body, tag: tag, icon: icon) }
-                if let v = s?.developer, !v.isEmpty { row("flask",         "Developer",v, body: body, tag: tag, icon: icon) }
+            let hasSession = (s?.enlarger.isEmpty == false) || (s?.lens.isEmpty == false) ||
+                             (s?.paper.isEmpty == false)    || (s?.developer.isEmpty == false)
+            if hasSession {
+                if let v = s?.enlarger,  !v.isEmpty { row("viewfinder",    "Enlarger",  v, body: body, tag: tag, icon: icon) }
+                if let v = s?.lens,      !v.isEmpty { row("camera.aperture","Lens",     v, body: body, tag: tag, icon: icon) }
+                if let v = s?.paper,     !v.isEmpty { row("doc.plaintext", "Paper",     v, body: body, tag: tag, icon: icon) }
+                if let v = s?.developer, !v.isEmpty { row("drop",          "Developer", v, body: body, tag: tag, icon: icon) }
             }
 
-            // Exposure
-            let ap = print.aperture
-            let ex = exposureText
-            if !ap.isEmpty || !ex.isEmpty {
-                Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
-                if !ap.isEmpty { row("f.cursive", "Aperture", ap, body: body, tag: tag, icon: icon) }
-                if !ex.isEmpty { row("timer",     "Exposure", ex, body: body, tag: tag, icon: icon) }
+            // Film: stock · format, then camera/lens/developer from roll
+            if let roll = print.filmRoll {
+                let filmValue = [roll.film, roll.filmType].filter { !$0.isEmpty }.joined(separator: " · ")
+                let hasFilmInfo = !filmValue.isEmpty || !roll.camera.isEmpty || !roll.lens.isEmpty || !roll.developer.isEmpty
+                if hasFilmInfo {
+                    Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
+                    if !filmValue.isEmpty      { row("film",           "Film",        filmValue,      body: body, tag: tag, icon: icon) }
+                    if !roll.camera.isEmpty    { row("camera",         "Camera",      roll.camera,    body: body, tag: tag, icon: icon) }
+                    if !roll.lens.isEmpty      { row("camera.aperture","Camera Lens", roll.lens,      body: body, tag: tag, icon: icon) }
+                    if !roll.developer.isEmpty { row("flask",          "Film Dev.",   roll.developer, body: body, tag: tag, icon: icon) }
+                }
             }
         }
         .padding(p)
@@ -709,33 +689,94 @@ struct PrintShareCardView: View {
 
 // MARK: - Share preview sheet
 
+
 struct PrintSharePreviewSheet: View {
     let print: Print
     @Environment(\.dismiss) private var dismiss
     @State private var layout: ShareLayout = .portrait
     @State private var thumbPortrait: UIImage? = nil
-    @State private var thumbLandscape: UIImage? = nil
     @State private var shareItems: [Any]? = nil
+    // Photo repositioning (landscape only)
+    @GestureState private var dragOffset: CGSize = .zero
+    @State private var accumulatedOffset: CGSize = .zero
+    @GestureState private var pinchScale: CGFloat = 1.0
+    @State private var accumulatedScale: CGFloat = 1.0
+    @State private var landscapeCardHeight: CGFloat = 320
 
-    private var currentThumb: UIImage? {
-        layout == .portrait ? thumbPortrait : thumbLandscape
+    private var photoOffset: CGSize {
+        CGSize(width: accumulatedOffset.width + dragOffset.width,
+               height: accumulatedOffset.height + dragOffset.height)
+    }
+
+    private var photoScale: CGFloat {
+        max(0.5, min(4.0, accumulatedScale * pinchScale))
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Preview
-                ZStack {
-                    Color(.systemGroupedBackground).ignoresSafeArea()
-                    if let thumb = currentThumb {
-                        Image(uiImage: thumb)
-                            .resizable()
-                            .scaledToFit()
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
-                            .padding(24)
-                    } else {
-                        ProgressView()
+                GeometryReader { geo in
+                    ZStack {
+                        Color(.systemGroupedBackground).ignoresSafeArea()
+
+                        if layout == .landscape {
+                            // Live interactive preview for landscape
+                            let scale = (geo.size.width - 48) / 390
+                            VStack(spacing: 8) {
+                                PrintShareCardView(print: print, layout: .landscape,
+                                                   photoOffset: photoOffset,
+                                                   photoScale: photoScale)
+                                    .frame(width: 390)
+                                    .scaleEffect(scale, anchor: .top)
+                                    .frame(
+                                        width: geo.size.width - 48,
+                                        height: landscapeCardHeight * scale,
+                                        alignment: .top
+                                    )
+                                    .clipped()
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
+                                    .gesture(
+                                        DragGesture()
+                                            .updating($dragOffset) { value, state, _ in
+                                                state = CGSize(
+                                                    width: value.translation.width / scale,
+                                                    height: value.translation.height / scale
+                                                )
+                                            }
+                                            .onEnded { value in
+                                                accumulatedOffset.width  += value.translation.width  / scale
+                                                accumulatedOffset.height += value.translation.height / scale
+                                            }
+                                        .simultaneously(with:
+                                            MagnificationGesture()
+                                                .updating($pinchScale) { value, state, _ in state = value }
+                                                .onEnded { value in
+                                                    accumulatedScale = max(0.5, min(4.0, accumulatedScale * value))
+                                                }
+                                        )
+                                    )
+                                if print.photoData != nil {
+                                    Text("Drag to reposition photo")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            // Static thumbnail for portrait (no crop)
+                            if let thumb = thumbPortrait {
+                                Image(uiImage: thumb)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
+                                    .padding(24)
+                            } else {
+                                ProgressView()
+                            }
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -747,11 +788,17 @@ struct PrintSharePreviewSheet: View {
                         Text("Landscape").tag(ShareLayout.landscape)
                     }
                     .pickerStyle(.segmented)
+                    .onChange(of: layout) { _, _ in
+                        accumulatedOffset = .zero
+                        accumulatedScale = 1.0
+                    }
 
                     Button {
                         Task { @MainActor in
                             let renderer = ImageRenderer(
-                                content: PrintShareCardView(print: print, layout: layout)
+                                content: PrintShareCardView(print: print, layout: layout,
+                                                           photoOffset: photoOffset,
+                                                           photoScale: photoScale)
                             )
                             renderer.scale = 3.0
                             if let img = renderer.uiImage, let url = saveToTemp(img) {
@@ -776,7 +823,7 @@ struct PrintSharePreviewSheet: View {
                 }
             }
         }
-        .task { await renderThumbs() }
+        .task { await renderPortraitThumb() }
         .sheet(isPresented: .init(
             get: { shareItems != nil },
             set: { if !$0 { shareItems = nil } }
@@ -788,14 +835,20 @@ struct PrintSharePreviewSheet: View {
     }
 
     @MainActor
-    private func renderThumbs() async {
+    private func renderPortraitThumb() async {
         let rp = ImageRenderer(content: PrintShareCardView(print: print, layout: .portrait))
         rp.scale = 1.5
         thumbPortrait = rp.uiImage
 
-        let rl = ImageRenderer(content: PrintShareCardView(print: print, layout: .landscape))
-        rl.scale = 1.5
-        thumbLandscape = rl.uiImage
+        // Measure landscape card height at 1× (pixels = points at scale 1)
+        let measurer = ImageRenderer(
+            content: PrintShareCardView(print: print, layout: .landscape,
+                                        photoOffset: .zero, photoScale: 1.0)
+        )
+        measurer.scale = 1.0
+        if let img = measurer.uiImage {
+            landscapeCardHeight = img.size.height
+        }
     }
 
     private func saveToTemp(_ image: UIImage) -> URL? {

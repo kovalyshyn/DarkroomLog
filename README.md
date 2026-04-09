@@ -49,7 +49,7 @@ A standard timer for use outside the darkroom (developing tank, chemical mixing)
 
 ## Requirements
 
-- iOS 17.6+
+- iOS 18.6+
 - Xcode 16+
 
 ## Installation
