@@ -61,6 +61,15 @@ struct SessionListView: View {
             .searchable(text: $searchText, prompt: "Name, paper, developer…")
             .listStyle(.insetGrouped)
             .navigationTitle("Darkroom")
+            .overlay {
+                if sessions.isEmpty {
+                    ContentUnavailableView(
+                        "No Sessions",
+                        systemImage: "photo.stack",
+                        description: Text("Start your first darkroom session.")
+                    )
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {

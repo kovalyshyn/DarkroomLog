@@ -9,6 +9,7 @@ struct BackupData: Codable {
     let equipment: [EquipmentRecord]
     let filmRolls: [FilmRollRecord]
     let sessions: [SessionRecord]
+    var chemBatches: [ChemBatchRecord] = []
 }
 
 struct EquipmentRecord: Codable {
@@ -40,6 +41,16 @@ struct SessionRecord: Codable {
     let prints: [PrintRecord]
 }
 
+struct ChemBatchRecord: Codable {
+    let name: String
+    let notes: String
+    let mixedOn: Date
+    let maxUnits: Int
+    let usedUnits: Int
+    let expiryMonths: Int
+    let createdAt: Date
+}
+
 struct PrintRecord: Codable {
     let id: UUID
     let name: String
@@ -60,10 +71,11 @@ enum BackupManager {
     static func exportData(
         sessions: [Session],
         equipment: [Equipment],
-        filmRolls: [FilmRoll]
+        filmRolls: [FilmRoll],
+        chemBatches: [ChemBatch] = []
     ) throws -> Data {
         let backup = BackupData(
-            version: 1,
+            version: 2,
             exportedAt: Date(),
             equipment: equipment.map {
                 EquipmentRecord(name: $0.name, category: $0.category)
@@ -94,6 +106,14 @@ enum BackupManager {
                         )
                     }
                 )
+            },
+            chemBatches: chemBatches.map {
+                ChemBatchRecord(
+                    name: $0.name, notes: $0.notes,
+                    mixedOn: $0.mixedOn, maxUnits: $0.maxUnits,
+                    usedUnits: $0.usedUnits, expiryMonths: $0.expiryMonths,
+                    createdAt: $0.createdAt
+                )
             }
         )
 
@@ -113,6 +133,7 @@ enum BackupManager {
         try context.delete(model: Session.self)
         try context.delete(model: FilmRoll.self)
         try context.delete(model: Equipment.self)
+        try context.delete(model: ChemBatch.self)
 
         // Restore equipment
         for rec in backup.equipment {
@@ -162,6 +183,18 @@ enum BackupManager {
                 context.insert(p)
                 session.prints.append(p)
             }
+        }
+
+        // Restore chemistry batches (v2+ backups)
+        for rec in backup.chemBatches {
+            let batch = ChemBatch(
+                name: rec.name, notes: rec.notes,
+                mixedOn: rec.mixedOn, maxUnits: rec.maxUnits,
+                expiryMonths: rec.expiryMonths
+            )
+            batch.usedUnits = rec.usedUnits
+            batch.createdAt = rec.createdAt
+            context.insert(batch)
         }
     }
 }

@@ -32,6 +32,7 @@ struct SettingsView: View {
     @Query private var sessions: [Session]
     @Query private var equipment: [Equipment]
     @Query private var filmRolls: [FilmRoll]
+    @Query private var chemBatches: [ChemBatch]
 
     @State private var exportDocument: BackupFileDocument?
     @State private var exportFilename = "DarkroomLog-backup.json"
@@ -64,7 +65,8 @@ struct SettingsView: View {
                         let data = try BackupManager.exportData(
                             sessions: sessions,
                             equipment: equipment,
-                            filmRolls: filmRolls
+                            filmRolls: filmRolls,
+                            chemBatches: chemBatches
                         )
                         let formatter = DateFormatter()
                         formatter.dateFormat = "yyyy-MM-dd"

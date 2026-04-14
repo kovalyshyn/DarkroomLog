@@ -91,6 +91,28 @@ class FilmRoll {
 }
 
 @Model
+class ChemBatch {
+    var name: String
+    var notes: String
+    var mixedOn: Date
+    var maxUnits: Int      // capacity in rolls
+    var usedUnits: Int     // manually incremented
+    var expiryMonths: Int
+    var createdAt: Date
+
+    init(name: String = "", notes: String = "", mixedOn: Date = Date(),
+         maxUnits: Int = 20, expiryMonths: Int = 6) {
+        self.name = name
+        self.notes = notes
+        self.mixedOn = mixedOn
+        self.maxUnits = maxUnits
+        self.usedUnits = 0
+        self.expiryMonths = expiryMonths
+        self.createdAt = Date()
+    }
+}
+
+@Model
 class Print {
     var id: UUID
     var name: String = ""
