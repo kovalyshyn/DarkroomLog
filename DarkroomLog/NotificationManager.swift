@@ -80,7 +80,9 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
               let timers = try? JSONDecoder().decode([WashTimer].self, from: data) else {
             return []
         }
-        return timers.filter { !$0.isExpired }
+        let active = timers.filter { !$0.isExpired }
+        if active.count != timers.count { saveTimers(active) }
+        return active
     }
 
     private func saveTimers(_ timers: [WashTimer]) {

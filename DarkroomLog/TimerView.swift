@@ -5,6 +5,7 @@ import CoreMotion
 struct TimerView: View {
     var onStop: ((Int) -> Void)? = nil
     var intervals: [Int] = []
+    var stepNames: [String] = []
     var darkroomMode: Bool = true
 
     @State private var elapsed: Int = 0
@@ -26,6 +27,22 @@ struct TimerView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
 
+    private var stepProgress: Double {
+        guard !intervals.isEmpty, isRunning, !skipIntervals,
+              nextTargetIndex < intervals.count else { return 0 }
+        let stepStart = nextTargetIndex > 0 ? cumulativeTargets[nextTargetIndex - 1] : 0
+        let stepDuration = intervals[nextTargetIndex]
+        guard stepDuration > 0 else { return 1 }
+        return Double(elapsed - stepStart) / Double(stepDuration)
+    }
+
+    private var currentStepName: String? {
+        guard stepNames.count == intervals.count,
+              nextTargetIndex < stepNames.count else { return nil }
+        let n = stepNames[nextTargetIndex]
+        return n.isEmpty ? nil : n
+    }
+
     private var cumulativeTargets: [Int] {
         var result: [Int] = []
         var sum = 0
@@ -44,10 +61,17 @@ struct TimerView: View {
                 Spacer()
 
                 if !intervals.isEmpty && isRunning && !skipIntervals {
-                    Text("Step \(min(nextTargetIndex + 1, intervals.count)) of \(intervals.count)")
-                        .font(.system(size: 14, weight: .regular))
-                        .foregroundStyle(darkroomMode ? Color(red: 0.4, green: 0, blue: 0) : Color.white.opacity(0.5))
-                        .padding(.bottom, 8)
+                    VStack(spacing: 4) {
+                        if let name = currentStepName {
+                            Text(name)
+                                .font(.system(size: 16, weight: .light))
+                                .foregroundStyle(darkroomMode ? Color(red: 0.5, green: 0.05, blue: 0.05) : Color.white.opacity(0.55))
+                        }
+                        Text("\(min(nextTargetIndex + 1, intervals.count)) / \(intervals.count)")
+                            .font(.system(size: 14, weight: .regular))
+                            .foregroundStyle(darkroomMode ? Color(red: 0.4, green: 0, blue: 0) : Color.white.opacity(0.4))
+                    }
+                    .padding(.bottom, 10)
                 }
 
                 Text(formattedTime)
@@ -57,6 +81,23 @@ struct TimerView: View {
                         : (isRunning ? Color.white : Color.white.opacity(0.35)))
                     .contentTransition(.numericText())
                     .animation(.linear(duration: 0.1), value: elapsed)
+
+                if !intervals.isEmpty && isRunning && !skipIntervals {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Rectangle()
+                                .fill(darkroomMode ? Color(red: 0.2, green: 0, blue: 0) : Color.white.opacity(0.12))
+                                .frame(height: 2)
+                            Rectangle()
+                                .fill(darkroomMode ? Color(red: 0.85, green: 0.1, blue: 0) : Color.white.opacity(0.65))
+                                .frame(width: geo.size.width * max(0, min(1, stepProgress)), height: 2)
+                                .animation(.linear(duration: 1), value: elapsed)
+                        }
+                    }
+                    .frame(height: 2)
+                    .padding(.horizontal, 40)
+                    .padding(.top, 20)
+                }
 
                 Spacer()
 

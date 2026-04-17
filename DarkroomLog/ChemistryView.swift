@@ -251,11 +251,12 @@ struct ChemBatchDetailView: View {
 
             // Delete
             Section {
-                Button(role: .destructive) {
+                Button {
                     showDeleteConfirm = true
                 } label: {
                     Label("Delete", systemImage: "trash")
                 }
+                .foregroundStyle(.red)
             }
         }
         .navigationTitle(batch.name)
@@ -265,11 +266,7 @@ struct ChemBatchDetailView: View {
                 Button("Edit") { showEdit = true }
             }
         }
-        .confirmationDialog(
-            "Delete \(batch.name)?",
-            isPresented: $showDeleteConfirm,
-            titleVisibility: .visible
-        ) {
+        .alert("Delete \(batch.name)?", isPresented: $showDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 context.delete(batch)
                 dismiss()

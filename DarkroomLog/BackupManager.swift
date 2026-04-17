@@ -9,12 +9,18 @@ struct BackupData: Codable {
     let equipment: [EquipmentRecord]
     let filmRolls: [FilmRollRecord]
     let sessions: [SessionRecord]
-    var chemBatches: [ChemBatchRecord] = []
+    var chemBatches: [ChemBatchRecord]?
 }
 
 struct EquipmentRecord: Codable {
     let name: String
     let category: String
+}
+
+struct FilmDevStepRecord: Codable {
+    let name: String
+    let seconds: Int
+    let order: Int
 }
 
 struct FilmRollRecord: Codable {
@@ -27,6 +33,7 @@ struct FilmRollRecord: Codable {
     let lens: String
     let developer: String
     let notes: String
+    var devSteps: [FilmDevStepRecord]?
 }
 
 struct SessionRecord: Codable {
@@ -80,12 +87,15 @@ enum BackupManager {
             equipment: equipment.map {
                 EquipmentRecord(name: $0.name, category: $0.category)
             },
-            filmRolls: filmRolls.map {
+            filmRolls: filmRolls.map { roll in
                 FilmRollRecord(
-                    id: $0.id, name: $0.name, date: $0.date,
-                    filmType: $0.filmType, film: $0.film,
-                    camera: $0.camera, lens: $0.lens,
-                    developer: $0.developer, notes: $0.notes
+                    id: roll.id, name: roll.name, date: roll.date,
+                    filmType: roll.filmType, film: roll.film,
+                    camera: roll.camera, lens: roll.lens,
+                    developer: roll.developer, notes: roll.notes,
+                    devSteps: roll.devSteps.sorted { $0.order < $1.order }.map {
+                        FilmDevStepRecord(name: $0.name, seconds: $0.seconds, order: $0.order)
+                    }
                 )
             },
             sessions: sessions.map { s in
@@ -153,6 +163,11 @@ enum BackupManager {
             roll.id = rec.id
             roll.date = rec.date
             context.insert(roll)
+            for stepRec in rec.devSteps ?? [] {
+                let step = FilmDevStep(name: stepRec.name, seconds: stepRec.seconds, order: stepRec.order)
+                context.insert(step)
+                roll.devSteps.append(step)
+            }
             rollMap[rec.id] = roll
         }
 
@@ -186,7 +201,7 @@ enum BackupManager {
         }
 
         // Restore chemistry batches (v2+ backups)
-        for rec in backup.chemBatches {
+        for rec in backup.chemBatches ?? [] {
             let batch = ChemBatch(
                 name: rec.name, notes: rec.notes,
                 mixedOn: rec.mixedOn, maxUnits: rec.maxUnits,

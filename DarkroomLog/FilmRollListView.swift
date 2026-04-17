@@ -126,6 +126,8 @@ struct FilmRollDetailView: View {
 
     @State private var editingRoll = false
     @State private var showSharePreview = false
+    @State private var showAddStep = false
+    @State private var editingStep: FilmDevStep? = nil
 
     private var linkedPrints: [Print] {
         allPrints
@@ -153,6 +155,50 @@ struct FilmRollDetailView: View {
                 Section("Notes") {
                     Text(roll.notes)
                         .foregroundStyle(.secondary)
+                }
+            }
+
+            let sortedSteps = roll.devSteps.sorted(by: { $0.order < $1.order })
+
+            Section("Development Steps") {
+                ForEach(Array(sortedSteps.enumerated()), id: \.element.persistentModelID) { i, step in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(step.name.isEmpty ? "Step \(i + 1)" : step.name)
+                            Text(formatDevSeconds(step.seconds))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "pencil")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture { editingStep = step }
+                }
+                .onDelete { offsets in
+                    for i in offsets {
+                        let step = sortedSteps[i]
+                        roll.devSteps.removeAll { $0.persistentModelID == step.persistentModelID }
+                        context.delete(step)
+                    }
+                }
+
+                Button { showAddStep = true } label: {
+                    Label("Add Step", systemImage: "plus")
+                }
+            }
+
+            if !sortedSteps.isEmpty {
+                Section {
+                    NavigationLink(destination: TimerView(
+                        intervals: sortedSteps.map { $0.seconds },
+                        stepNames: sortedSteps.map { $0.name },
+                        darkroomMode: false
+                    )) {
+                        Label("Start Dev Timer", systemImage: "timer")
+                    }
                 }
             }
 
@@ -205,6 +251,27 @@ struct FilmRollDetailView: View {
         .sheet(isPresented: $showSharePreview) {
             FilmRollSharePreviewSheet(roll: roll, printCount: linkedPrints.count)
         }
+        .sheet(isPresented: $showAddStep) {
+            FilmDevStepFormView { name, seconds in
+                let step = FilmDevStep(name: name, seconds: seconds, order: roll.devSteps.count)
+                context.insert(step)
+                roll.devSteps.append(step)
+            }
+        }
+        .sheet(item: $editingStep) { step in
+            FilmDevStepFormView(existingName: step.name, existingSeconds: step.seconds) { name, seconds in
+                step.name = name
+                step.seconds = seconds
+            }
+        }
+    }
+
+    private func formatDevSeconds(_ s: Int) -> String {
+        let m = s / 60
+        let sec = s % 60
+        if m == 0 { return "\(sec)s" }
+        if sec == 0 { return "\(m)m" }
+        return "\(m)m \(sec)s"
     }
 }
 
@@ -399,6 +466,53 @@ struct FilmRollSharePreviewSheet: View {
         guard let data = image.jpegData(compressionQuality: 0.92) else { return nil }
         try? data.write(to: url, options: .atomic)
         return url
+    }
+}
+
+// MARK: - Film Dev Step Form
+
+struct FilmDevStepFormView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var existingName: String = ""
+    var existingSeconds: Int = 60
+    var onSave: (String, Int) -> Void
+
+    @State private var name: String = ""
+    @State private var minutes: Int = 1
+    @State private var seconds: Int = 0
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Step") {
+                    TextField("Name (optional)", text: $name)
+                }
+                Section("Duration") {
+                    Stepper("\(minutes) min", value: $minutes, in: 0...99)
+                    Stepper("\(seconds) sec", value: $seconds, in: 0...59)
+                }
+            }
+            .navigationTitle(existingSeconds == 0 && existingName.isEmpty ? "New Step" : "Edit Step")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        onSave(name.trimmingCharacters(in: .whitespaces), minutes * 60 + seconds)
+                        dismiss()
+                    }
+                    .disabled(minutes == 0 && seconds == 0)
+                }
+            }
+            .onAppear {
+                name = existingName
+                minutes = existingSeconds / 60
+                seconds = existingSeconds % 60
+            }
+        }
     }
 }
 

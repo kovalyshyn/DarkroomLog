@@ -75,6 +75,7 @@ class FilmRoll {
     var lens: String
     var developer: String
     var notes: String
+    @Relationship(deleteRule: .cascade) var devSteps: [FilmDevStep] = []
 
     init(name: String = "", filmType: String = "135", film: String = "",
          camera: String = "", lens: String = "", developer: String = "", notes: String = "") {
@@ -87,6 +88,19 @@ class FilmRoll {
         self.lens = lens
         self.developer = developer
         self.notes = notes
+    }
+}
+
+@Model
+class FilmDevStep {
+    var name: String
+    var seconds: Int
+    var order: Int
+
+    init(name: String = "", seconds: Int = 60, order: Int = 0) {
+        self.name = name
+        self.seconds = seconds
+        self.order = order
     }
 }
 

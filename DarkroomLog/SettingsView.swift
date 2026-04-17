@@ -120,11 +120,7 @@ struct SettingsView: View {
                 showAlert = true
             }
         }
-        .confirmationDialog(
-            "Restore Backup",
-            isPresented: $showRestoreConfirm,
-            titleVisibility: .visible
-        ) {
+        .alert("Restore Backup", isPresented: $showRestoreConfirm) {
             Button("Replace all data and restore", role: .destructive) {
                 guard let url = pendingRestoreURL else { return }
                 let accessed = url.startAccessingSecurityScopedResource()

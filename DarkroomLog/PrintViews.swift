@@ -361,7 +361,7 @@ struct PrintDetailView: View {
             now = date
             activeWashTimer = NotificationManager.shared.activeTimer(for: print.id.uuidString)
         }
-        .confirmationDialog("Wash Timer", isPresented: $showWashTimerPicker, titleVisibility: .visible) {
+        .alert("Wash Timer", isPresented: $showWashTimerPicker) {
             Button("10 minutes") { scheduleWash(minutes: 10) }
             Button("20 minutes") { scheduleWash(minutes: 20) }
             Button("30 minutes") { scheduleWash(minutes: 30) }
