@@ -23,7 +23,7 @@ struct AboutView: View {
             .listRowBackground(Color.clear)
 
             Section("About") {
-                Text("DarkroomLog helps analog photographers log darkroom sessions, track exposure times, catalog film rolls, and keep notes on every print.")
+                Text("An iOS app for analog darkroom photographers. Log printing sessions, catalog film rolls, track chemistry, share your work, and keep notes on every print.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 4)

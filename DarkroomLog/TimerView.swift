@@ -6,6 +6,7 @@ struct TimerView: View {
     var onStop: ((Int) -> Void)? = nil
     var intervals: [Int] = []
     var stepNames: [String] = []
+    var agitationSchemes: [AgitationScheme?] = []
     var darkroomMode: Bool = true
 
     @State private var elapsed: Int = 0
@@ -21,6 +22,8 @@ struct TimerView: View {
         .compactMap { $0 as? UIWindowScene }.first?.screen.brightness ?? 0.5
     @State private var nextTargetIndex: Int = 0
     @State private var skipIntervals: Bool = false
+    @State private var isAgitating: Bool = false
+    @State private var agitationPulse: Double = 0
 
     @AppStorage("metronomeEnabled") private var metronomeEnabled: Bool = true
 
@@ -97,6 +100,12 @@ struct TimerView: View {
                     .frame(height: 2)
                     .padding(.horizontal, 40)
                     .padding(.top, 20)
+
+                    Text("🌀")
+                        .font(.system(size: 48))
+                        .opacity(isAgitating ? (0.3 + 0.7 * agitationPulse) : 0)
+                        .padding(.top, 16)
+                        .animation(isAgitating ? nil : .easeOut(duration: 0.3), value: isAgitating)
                 }
 
                 Spacer()
@@ -179,11 +188,14 @@ struct TimerView: View {
         isRunning = true
         elapsed = 0
         nextTargetIndex = 0
+        isAgitating = false
+        agitationPulse = 0
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             elapsed += 1
             playTick()
             checkIntervalBell()
             checkMinuteBell()
+            updateAgitation()
         }
     }
 
@@ -193,11 +205,14 @@ struct TimerView: View {
         elapsed = 0
         nextTargetIndex = 0
         skipIntervals = false
+        isAgitating = false
+        agitationPulse = 0
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             elapsed += 1
             playTick()
             checkIntervalBell()
             checkMinuteBell()
+            updateAgitation()
         }
     }
 
@@ -206,6 +221,44 @@ struct TimerView: View {
         timer = nil
         isRunning = false
         screen?.brightness = originalBrightness
+    }
+
+    // MARK: - Agitation
+
+    private func updateAgitation() {
+        guard !agitationSchemes.isEmpty,
+              nextTargetIndex < agitationSchemes.count,
+              let scheme = agitationSchemes[nextTargetIndex],
+              isRunning, !skipIntervals else {
+            if isAgitating { stopAgitation() }
+            return
+        }
+        let stepStart = nextTargetIndex > 0 ? cumulativeTargets[nextTargetIndex - 1] : 0
+        let stepElapsed = elapsed - stepStart
+        let shouldAgitate: Bool
+        if scheme.initialSeconds > 0 && stepElapsed <= scheme.initialSeconds {
+            shouldAgitate = true
+        } else {
+            shouldAgitate = scheme.intervalSeconds > 0 &&
+                            stepElapsed >= scheme.intervalSeconds &&
+                            (stepElapsed % scheme.intervalSeconds) < scheme.durationSeconds
+        }
+        guard shouldAgitate != isAgitating else { return }
+        isAgitating = shouldAgitate
+        if shouldAgitate {
+            if stepElapsed > scheme.initialSeconds { playBell() }
+            agitationPulse = 0
+            withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+                agitationPulse = 1
+            }
+        } else {
+            stopAgitation()
+        }
+    }
+
+    private func stopAgitation() {
+        isAgitating = false
+        withAnimation(.easeOut(duration: 0.3)) { agitationPulse = 0 }
     }
 
     // MARK: - Interval bells
@@ -228,6 +281,10 @@ struct TimerView: View {
 
     private func checkMinuteBell() {
         guard !darkroomMode, elapsed > 0, elapsed % 60 == 0 else { return }
+        let currentStepHasAgitation = !agitationSchemes.isEmpty &&
+            nextTargetIndex < agitationSchemes.count &&
+            agitationSchemes[nextTargetIndex] != nil
+        guard !currentStepHasAgitation else { return }
         playBell()
     }
 
@@ -264,7 +321,7 @@ struct TimerView: View {
     // MARK: - Motion detection
 
     private func startMotionDetection() {
-        guard motionManager.isAccelerometerAvailable else { return }
+        guard darkroomMode, motionManager.isAccelerometerAvailable else { return }
         motionManager.accelerometerUpdateInterval = 0.05 // 20 Hz
 
         motionManager.startAccelerometerUpdates(to: .main) { data, _ in

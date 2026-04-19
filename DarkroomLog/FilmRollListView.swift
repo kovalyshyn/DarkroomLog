@@ -1,6 +1,16 @@
 import SwiftUI
 import SwiftData
 
+private func statusColor(_ s: FilmRollStatus) -> Color {
+    switch s {
+    case .loaded:     return .blue
+    case .exposed:    return .orange
+    case .developing: return .purple
+    case .developed:  return .green
+    case .done:       return .secondary
+    }
+}
+
 struct FilmRollListView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \FilmRoll.date, order: .reverse) private var rolls: [FilmRoll]
@@ -89,6 +99,13 @@ struct FilmRollRow: View {
                 Text(roll.name.isEmpty ? "Unnamed roll" : roll.name)
                     .font(.headline)
                 Spacer()
+                Text(roll.rollStatus.label)
+                    .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(statusColor(roll.rollStatus).opacity(0.15))
+                    .foregroundStyle(statusColor(roll.rollStatus))
+                    .clipShape(Capsule())
                 Text(roll.filmType)
                     .font(.caption)
                     .padding(.horizontal, 8)
@@ -140,6 +157,13 @@ struct FilmRollDetailView: View {
             Section("Roll") {
                 LabeledContent("Format", value: roll.filmType)
                 LabeledContent("Date", value: roll.date.formatted(date: .abbreviated, time: .omitted))
+                HStack {
+                    Text("Status")
+                    Spacer()
+                    Label(roll.rollStatus.label, systemImage: roll.rollStatus.icon)
+                        .foregroundStyle(statusColor(roll.rollStatus))
+                        .font(.callout)
+                }
             }
 
             if !roll.film.isEmpty || !roll.developer.isEmpty || !roll.camera.isEmpty || !roll.lens.isEmpty {
@@ -195,9 +219,31 @@ struct FilmRollDetailView: View {
                     NavigationLink(destination: TimerView(
                         intervals: sortedSteps.map { $0.seconds },
                         stepNames: sortedSteps.map { $0.name },
+                        agitationSchemes: sortedSteps.map { $0.agitationScheme },
                         darkroomMode: false
                     )) {
                         Label("Start Dev Timer", systemImage: "timer")
+                    }
+                }
+            }
+
+            let history = roll.statusHistory
+            if !history.isEmpty {
+                Section("History") {
+                    ForEach(history, id: \.0) { s, date in
+                        HStack {
+                            Label(s.label, systemImage: s.icon)
+                                .foregroundStyle(statusColor(s))
+                            Spacer()
+                            Text(date.formatted(date: .abbreviated, time: .omitted))
+                                .foregroundStyle(.secondary)
+                                .font(.callout)
+                        }
+                    }
+                    .onDelete { offsets in
+                        for i in offsets {
+                            roll.clearStatus(history[i].0)
+                        }
                     }
                 }
             }
@@ -252,16 +298,30 @@ struct FilmRollDetailView: View {
             FilmRollSharePreviewSheet(roll: roll, printCount: linkedPrints.count)
         }
         .sheet(isPresented: $showAddStep) {
-            FilmDevStepFormView { name, seconds in
+            FilmDevStepFormView { name, seconds, agitation in
                 let step = FilmDevStep(name: name, seconds: seconds, order: roll.devSteps.count)
+                if let a = agitation {
+                    step.agitationEnabled = true
+                    step.agitationInitialSeconds = a.initialSeconds
+                    step.agitationIntervalSeconds = a.intervalSeconds
+                    step.agitationDurationSeconds = a.durationSeconds
+                }
                 context.insert(step)
                 roll.devSteps.append(step)
             }
         }
         .sheet(item: $editingStep) { step in
-            FilmDevStepFormView(existingName: step.name, existingSeconds: step.seconds) { name, seconds in
+            FilmDevStepFormView(
+                existingName: step.name,
+                existingSeconds: step.seconds,
+                existingAgitation: step.agitationScheme
+            ) { name, seconds, agitation in
                 step.name = name
                 step.seconds = seconds
+                step.agitationEnabled = agitation != nil
+                step.agitationInitialSeconds = agitation?.initialSeconds ?? 0
+                step.agitationIntervalSeconds = agitation?.intervalSeconds ?? 30
+                step.agitationDurationSeconds = agitation?.durationSeconds ?? 10
             }
         }
     }
@@ -476,11 +536,16 @@ struct FilmDevStepFormView: View {
 
     var existingName: String = ""
     var existingSeconds: Int = 60
-    var onSave: (String, Int) -> Void
+    var existingAgitation: AgitationScheme? = nil
+    var onSave: (String, Int, AgitationScheme?) -> Void
 
     @State private var name: String = ""
     @State private var minutes: Int = 1
     @State private var seconds: Int = 0
+    @State private var agitationEnabled: Bool = false
+    @State private var agitationInitial: Int = 0
+    @State private var agitationInterval: Int = 30
+    @State private var agitationDuration: Int = 10
 
     var body: some View {
         NavigationStack {
@@ -492,6 +557,17 @@ struct FilmDevStepFormView: View {
                     Stepper("\(minutes) min", value: $minutes, in: 0...99)
                     Stepper("\(seconds) sec", value: $seconds, in: 0...59)
                 }
+                Section {
+                    Toggle("Agitation", isOn: $agitationEnabled.animation())
+                    if agitationEnabled {
+                        Stepper(
+                            agitationInitial == 0 ? "Initial: none" : "Initial: \(agitationInitial)s continuous",
+                            value: $agitationInitial, in: 0...120, step: 15
+                        )
+                        Stepper("Every: \(agitationInterval)s", value: $agitationInterval, in: 10...120, step: 10)
+                        Stepper("For: \(agitationDuration)s", value: $agitationDuration, in: 5...30, step: 5)
+                    }
+                }
             }
             .navigationTitle(existingSeconds == 0 && existingName.isEmpty ? "New Step" : "Edit Step")
             .navigationBarTitleDisplayMode(.inline)
@@ -501,7 +577,13 @@ struct FilmDevStepFormView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        onSave(name.trimmingCharacters(in: .whitespaces), minutes * 60 + seconds)
+                        let scheme: AgitationScheme? = agitationEnabled
+                            ? AgitationScheme(
+                                initialSeconds: agitationInitial,
+                                intervalSeconds: agitationInterval,
+                                durationSeconds: agitationDuration)
+                            : nil
+                        onSave(name.trimmingCharacters(in: .whitespaces), minutes * 60 + seconds, scheme)
                         dismiss()
                     }
                     .disabled(minutes == 0 && seconds == 0)
@@ -511,6 +593,12 @@ struct FilmDevStepFormView: View {
                 name = existingName
                 minutes = existingSeconds / 60
                 seconds = existingSeconds % 60
+                if let a = existingAgitation {
+                    agitationEnabled = true
+                    agitationInitial = a.initialSeconds
+                    agitationInterval = a.intervalSeconds
+                    agitationDuration = a.durationSeconds
+                }
             }
         }
     }
@@ -531,6 +619,7 @@ struct FilmRollFormView: View {
     @State private var developer: String = ""
     @State private var notes: String = ""
 
+    @State private var status: FilmRollStatus = .loaded
     @State private var pickingFilmStock = false
     @State private var pickingCamera = false
     @State private var pickingLens = false
@@ -550,6 +639,11 @@ struct FilmRollFormView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    Picker("Status", selection: $status) {
+                        ForEach(FilmRollStatus.allCases, id: \.self) { s in
+                            Label(s.label, systemImage: s.icon).tag(s)
+                        }
+                    }
                 }
 
                 Section("Film") {
@@ -585,6 +679,7 @@ struct FilmRollFormView: View {
                     camera = r.camera
                     lens = r.lens
                     notes = r.notes
+                    status = r.rollStatus
                 }
             }
             .sheet(isPresented: $pickingFilmStock) { EquipmentPickerView(type: .filmStock, selection: $film) }
@@ -607,12 +702,18 @@ struct FilmRollFormView: View {
             r.camera = camera
             r.lens = lens
             r.notes = trimNotes
+            if status != r.rollStatus {
+                r.setStatus(status)
+            }
         } else {
             let r = FilmRoll(
                 name: trimName, filmType: filmType, film: film,
                 camera: camera, lens: lens, developer: developer, notes: trimNotes
             )
             r.date = date
+            if status != .loaded {
+                r.setStatus(status)
+            }
             context.insert(r)
         }
         dismiss()

@@ -8,6 +8,7 @@ private final class AppModel {
     init() {
         do {
             container = try ModelContainer(for: Session.self, Print.self, Equipment.self, FilmRoll.self, ChemBatch.self, FilmDevStep.self)
+            migrateLegacyRollsToDone(context: container.mainContext)
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }

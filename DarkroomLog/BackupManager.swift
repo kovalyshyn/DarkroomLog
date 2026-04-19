@@ -34,6 +34,12 @@ struct FilmRollRecord: Codable {
     let developer: String
     let notes: String
     var devSteps: [FilmDevStepRecord]?
+    var statusRaw: String?
+    var loadedAt: Date?
+    var exposedAt: Date?
+    var developingAt: Date?
+    var developedAt: Date?
+    var doneAt: Date?
 }
 
 struct SessionRecord: Codable {
@@ -95,7 +101,13 @@ enum BackupManager {
                     developer: roll.developer, notes: roll.notes,
                     devSteps: roll.devSteps.sorted { $0.order < $1.order }.map {
                         FilmDevStepRecord(name: $0.name, seconds: $0.seconds, order: $0.order)
-                    }
+                    },
+                    statusRaw: roll.statusRaw,
+                    loadedAt: roll.loadedAt,
+                    exposedAt: roll.exposedAt,
+                    developingAt: roll.developingAt,
+                    developedAt: roll.developedAt,
+                    doneAt: roll.doneAt
                 )
             },
             sessions: sessions.map { s in
@@ -162,6 +174,12 @@ enum BackupManager {
             )
             roll.id = rec.id
             roll.date = rec.date
+            roll.statusRaw = rec.statusRaw ?? FilmRollStatus.loaded.rawValue
+            roll.loadedAt = rec.loadedAt
+            roll.exposedAt = rec.exposedAt
+            roll.developingAt = rec.developingAt
+            roll.developedAt = rec.developedAt
+            roll.doneAt = rec.doneAt
             context.insert(roll)
             for stepRec in rec.devSteps ?? [] {
                 let step = FilmDevStep(name: stepRec.name, seconds: stepRec.seconds, order: stepRec.order)
