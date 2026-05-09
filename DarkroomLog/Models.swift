@@ -124,14 +124,14 @@ class FilmRoll {
         .sorted { $0.1 < $1.1 }
     }
 
-    func setStatus(_ s: FilmRollStatus) {
+    func setStatus(_ s: FilmRollStatus, at when: Date = Date()) {
         rollStatus = s
         switch s {
-        case .loaded:     loadedAt     = Date()
-        case .exposed:    exposedAt    = Date()
-        case .developing: developingAt = Date()
-        case .developed:  developedAt  = Date()
-        case .done:       doneAt       = Date()
+        case .loaded:     loadedAt     = when
+        case .exposed:    exposedAt    = when
+        case .developing: developingAt = when
+        case .developed:  developedAt  = when
+        case .done:       doneAt       = when
         }
     }
 

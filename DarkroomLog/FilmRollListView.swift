@@ -711,9 +711,8 @@ struct FilmRollFormView: View {
                 camera: camera, lens: lens, developer: developer, notes: trimNotes
             )
             r.date = date
-            if status != .loaded {
-                r.setStatus(status)
-            }
+            r.loadedAt = nil
+            r.setStatus(status, at: date)
             context.insert(r)
         }
         dismiss()

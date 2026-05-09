@@ -11,6 +11,7 @@ struct TimerView: View {
 
     @State private var elapsed: Int = 0
     @State private var isRunning: Bool = false
+    @State private var isPaused: Bool = false
     @State private var timer: Timer? = nil
     @State private var audioPlayer: AVAudioPlayer?
     @State private var bellPlayer: AVAudioPlayer?
@@ -25,6 +26,16 @@ struct TimerView: View {
     @State private var isAgitating: Bool = false
     @State private var agitationPulse: Double = 0
 
+    private var isDevTimer: Bool {
+        !darkroomMode && !intervals.isEmpty
+    }
+
+    private var stepElapsed: Int {
+        if isDevTimer { return elapsed }
+        let stepStart = nextTargetIndex > 0 ? cumulativeTargets[nextTargetIndex - 1] : 0
+        return elapsed - stepStart
+    }
+
     @AppStorage("metronomeEnabled") private var metronomeEnabled: Bool = true
 
     @Environment(\.scenePhase) private var scenePhase
@@ -33,10 +44,9 @@ struct TimerView: View {
     private var stepProgress: Double {
         guard !intervals.isEmpty, isRunning, !skipIntervals,
               nextTargetIndex < intervals.count else { return 0 }
-        let stepStart = nextTargetIndex > 0 ? cumulativeTargets[nextTargetIndex - 1] : 0
         let stepDuration = intervals[nextTargetIndex]
         guard stepDuration > 0 else { return 1 }
-        return Double(elapsed - stepStart) / Double(stepDuration)
+        return Double(stepElapsed) / Double(stepDuration)
     }
 
     private var currentStepName: String? {
@@ -81,7 +91,9 @@ struct TimerView: View {
                     .font(.system(size: 100, weight: .thin, design: .monospaced))
                     .foregroundStyle(darkroomMode
                         ? (isRunning ? Color(red: 1, green: 0.08, blue: 0) : Color(red: 0.4, green: 0, blue: 0))
-                        : (isRunning ? Color.white : Color.white.opacity(0.35)))
+                        : (isRunning
+                            ? (isDevTimer && isPaused ? Color.white.opacity(0.45) : Color.white)
+                            : Color.white.opacity(0.35)))
                     .contentTransition(.numericText())
                     .animation(.linear(duration: 0.1), value: elapsed)
 
@@ -121,6 +133,18 @@ struct TimerView: View {
                 }
 
                 let hintText: String = {
+                    if isDevTimer {
+                        if !isRunning && skipIntervals { return "done · swipe → to exit" }
+                        if !isRunning { return "tap to start" }
+                        if isPaused {
+                            if elapsed == 0 {
+                                let stepNum = min(nextTargetIndex + 1, intervals.count)
+                                return "tap to start step \(stepNum) · swipe ← to skip"
+                            }
+                            return "tap to resume · swipe ← to skip"
+                        }
+                        return "tap to pause · swipe ← to skip"
+                    }
                     if isRunning { return "tap · knock · toss to restart" }
                     if skipIntervals && !intervals.isEmpty { return "tap to continue free" }
                     return "tap to start"
@@ -139,6 +163,9 @@ struct TimerView: View {
                     if value.translation.width > 80 {
                         stopTimer()
                         dismiss()
+                    } else if value.translation.width < -80, isDevTimer, isRunning {
+                        playBell()
+                        advanceDevStep()
                     }
                 }
         )
@@ -168,10 +195,12 @@ struct TimerView: View {
     // MARK: - Tap
 
     private func handleTap() {
-        if isRunning {
-            restartTimer()
-        } else {
+        if !isRunning {
             startTimer()
+        } else if isDevTimer {
+            isPaused.toggle()
+        } else {
+            restartTimer()
         }
     }
 
@@ -186,11 +215,14 @@ struct TimerView: View {
         originalBrightness = screen?.brightness ?? 0.5
         if darkroomMode { screen?.brightness = 0.02 }
         isRunning = true
+        isPaused = false
         elapsed = 0
         nextTargetIndex = 0
+        skipIntervals = false
         isAgitating = false
         agitationPulse = 0
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            if isPaused { return }
             elapsed += 1
             playTick()
             checkIntervalBell()
@@ -205,15 +237,30 @@ struct TimerView: View {
         elapsed = 0
         nextTargetIndex = 0
         skipIntervals = false
+        isPaused = false
         isAgitating = false
         agitationPulse = 0
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            if isPaused { return }
             elapsed += 1
             playTick()
             checkIntervalBell()
             checkMinuteBell()
             updateAgitation()
         }
+    }
+
+    private func advanceDevStep() {
+        nextTargetIndex += 1
+        isAgitating = false
+        agitationPulse = 0
+        if nextTargetIndex >= intervals.count {
+            skipIntervals = true
+            stopTimer()
+            return
+        }
+        elapsed = 0
+        isPaused = true
     }
 
     private func stopTimer() {
@@ -233,20 +280,19 @@ struct TimerView: View {
             if isAgitating { stopAgitation() }
             return
         }
-        let stepStart = nextTargetIndex > 0 ? cumulativeTargets[nextTargetIndex - 1] : 0
-        let stepElapsed = elapsed - stepStart
+        let stepEl = stepElapsed
         let shouldAgitate: Bool
-        if scheme.initialSeconds > 0 && stepElapsed <= scheme.initialSeconds {
+        if scheme.initialSeconds > 0 && stepEl <= scheme.initialSeconds {
             shouldAgitate = true
         } else {
             shouldAgitate = scheme.intervalSeconds > 0 &&
-                            stepElapsed >= scheme.intervalSeconds &&
-                            (stepElapsed % scheme.intervalSeconds) < scheme.durationSeconds
+                            stepEl >= scheme.intervalSeconds &&
+                            (stepEl % scheme.intervalSeconds) < scheme.durationSeconds
         }
         guard shouldAgitate != isAgitating else { return }
         isAgitating = shouldAgitate
         if shouldAgitate {
-            if stepElapsed > scheme.initialSeconds { playBell() }
+            if stepEl > scheme.initialSeconds { playBell() }
             agitationPulse = 0
             withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
                 agitationPulse = 1
@@ -265,6 +311,14 @@ struct TimerView: View {
 
     private func checkIntervalBell() {
         guard !skipIntervals else { return }
+        if isDevTimer {
+            guard nextTargetIndex < intervals.count else { return }
+            if elapsed == intervals[nextTargetIndex] {
+                playBell()
+                advanceDevStep()
+            }
+            return
+        }
         let targets = cumulativeTargets
         guard nextTargetIndex < targets.count else { return }
         if elapsed == targets[nextTargetIndex] {
