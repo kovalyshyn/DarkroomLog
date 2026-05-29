@@ -138,9 +138,10 @@ struct AddPrintView: View {
             .photosPicker(isPresented: $showLibraryPicker, selection: $selectedPhoto, matching: .images)
             .onChange(of: selectedPhoto) { _, newItem in
                 Task {
-                    guard let data = try? await newItem?.loadTransferable(type: Data.self) else { return }
-                    // Compress off the main actor — large photos would otherwise hitch the UI.
-                    photoData = await Task.detached { UIImage(data: data).flatMap { compressedPhotoData($0) } }.value
+                    if let data = try? await newItem?.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        photoData = compressedPhotoData(image)
+                    }
                 }
             }
             .sheet(isPresented: $showCamera) {
@@ -378,9 +379,10 @@ struct PrintDetailView: View {
         .photosPicker(isPresented: $showLibraryPicker, selection: $selectedPhoto, matching: .images)
         .onChange(of: selectedPhoto) { _, newItem in
             Task {
-                guard let data = try? await newItem?.loadTransferable(type: Data.self) else { return }
-                // Compress off the main actor — large photos would otherwise hitch the UI.
-                print.photoData = await Task.detached { UIImage(data: data).flatMap { compressedPhotoData($0) } }.value
+                if let data = try? await newItem?.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    print.photoData = compressedPhotoData(image)
+                }
             }
         }
         .sheet(isPresented: $showCamera) {
