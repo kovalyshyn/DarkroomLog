@@ -182,6 +182,12 @@ struct TimerView: View {
             motionManager.stopAccelerometerUpdates()
             UIApplication.shared.isIdleTimerDisabled = false
         }
+        .onChange(of: scenePhase) { _, phase in
+            // Don't strand the screen at 2% if the app is backgrounded mid-timer;
+            // restore on leaving and re-dim when we come back.
+            guard darkroomMode, isRunning else { return }
+            screen?.brightness = (phase == .active) ? 0.02 : originalBrightness
+        }
         .preferredColorScheme(.dark)
         .statusBarHidden(true)
     }
@@ -211,8 +217,20 @@ struct TimerView: View {
             .compactMap { $0 as? UIWindowScene }.first?.screen
     }
 
+    private func makeTickTimer() -> Timer {
+        Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            if isPaused { return }
+            elapsed += 1
+            playTick()
+            checkIntervalBell()
+            checkMinuteBell()
+            updateAgitation()
+        }
+    }
+
     private func startTimer() {
-        originalBrightness = screen?.brightness ?? 0.5
+        // Never capture the already-dimmed value as "original".
+        if (screen?.brightness ?? 1) > 0.05 { originalBrightness = screen?.brightness ?? 0.5 }
         if darkroomMode { screen?.brightness = 0.02 }
         isRunning = true
         isPaused = false
@@ -221,14 +239,7 @@ struct TimerView: View {
         skipIntervals = false
         isAgitating = false
         agitationPulse = 0
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            if isPaused { return }
-            elapsed += 1
-            playTick()
-            checkIntervalBell()
-            checkMinuteBell()
-            updateAgitation()
-        }
+        timer = makeTickTimer()
     }
 
     private func restartTimer() {
@@ -240,14 +251,7 @@ struct TimerView: View {
         isPaused = false
         isAgitating = false
         agitationPulse = 0
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            if isPaused { return }
-            elapsed += 1
-            playTick()
-            checkIntervalBell()
-            checkMinuteBell()
-            updateAgitation()
-        }
+        timer = makeTickTimer()
     }
 
     private func advanceDevStep() {

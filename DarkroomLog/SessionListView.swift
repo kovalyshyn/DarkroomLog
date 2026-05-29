@@ -89,6 +89,9 @@ struct SessionListView: View {
                 washTimers = NotificationManager.shared.loadTimers()
             }
             .onReceive(ticker) { _ in
+                // No timers → nothing to refresh; avoids decoding UserDefaults every second.
+                // New timers are picked up by onAppear when returning from a print detail.
+                guard !washTimers.isEmpty else { return }
                 washTimers = NotificationManager.shared.loadTimers()
             }
         }

@@ -21,6 +21,11 @@ struct FilmDevStepRecord: Codable {
     let name: String
     let seconds: Int
     let order: Int
+    // Optional for backward compatibility with pre-v1.8 backups that lack these keys.
+    var agitationEnabled: Bool?
+    var agitationInitialSeconds: Int?
+    var agitationIntervalSeconds: Int?
+    var agitationDurationSeconds: Int?
 }
 
 struct FilmRollRecord: Codable {
@@ -100,7 +105,13 @@ enum BackupManager {
                     camera: roll.camera, lens: roll.lens,
                     developer: roll.developer, notes: roll.notes,
                     devSteps: roll.devSteps.sorted { $0.order < $1.order }.map {
-                        FilmDevStepRecord(name: $0.name, seconds: $0.seconds, order: $0.order)
+                        FilmDevStepRecord(
+                            name: $0.name, seconds: $0.seconds, order: $0.order,
+                            agitationEnabled: $0.agitationEnabled,
+                            agitationInitialSeconds: $0.agitationInitialSeconds,
+                            agitationIntervalSeconds: $0.agitationIntervalSeconds,
+                            agitationDurationSeconds: $0.agitationDurationSeconds
+                        )
                     },
                     statusRaw: roll.statusRaw,
                     loadedAt: roll.loadedAt,
@@ -149,19 +160,21 @@ enum BackupManager {
         let data = try Data(contentsOf: url)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
+        // Decode fully BEFORE touching the store: a corrupt or incompatible file
+        // throws here, leaving existing data untouched.
         let backup = try decoder.decode(BackupData.self, from: data)
 
-        // Delete all existing data (Session cascade-deletes Prints)
-        try context.delete(model: Session.self)
-        try context.delete(model: FilmRoll.self)
-        try context.delete(model: Equipment.self)
-        try context.delete(model: ChemBatch.self)
+        // Delete existing data as pending changes (not immediate batch deletes) so the
+        // whole restore — deletes + inserts — commits atomically in the final save().
+        // Deleting each Session cascade-deletes its Prints.
+        for s in (try? context.fetch(FetchDescriptor<Session>())) ?? [] { context.delete(s) }
+        for r in (try? context.fetch(FetchDescriptor<FilmRoll>())) ?? [] { context.delete(r) }
+        for e in (try? context.fetch(FetchDescriptor<Equipment>())) ?? [] { context.delete(e) }
+        for c in (try? context.fetch(FetchDescriptor<ChemBatch>())) ?? [] { context.delete(c) }
 
         // Restore equipment
         for rec in backup.equipment {
-            let eq = Equipment(name: rec.name, equipmentType: .enlarger)
-            eq.category = rec.category
-            context.insert(eq)
+            context.insert(Equipment(name: rec.name, category: rec.category))
         }
 
         // Restore film rolls, keep UUID for print linkage
@@ -183,6 +196,10 @@ enum BackupManager {
             context.insert(roll)
             for stepRec in rec.devSteps ?? [] {
                 let step = FilmDevStep(name: stepRec.name, seconds: stepRec.seconds, order: stepRec.order)
+                step.agitationEnabled = stepRec.agitationEnabled ?? false
+                step.agitationInitialSeconds = stepRec.agitationInitialSeconds ?? 0
+                step.agitationIntervalSeconds = stepRec.agitationIntervalSeconds ?? 30
+                step.agitationDurationSeconds = stepRec.agitationDurationSeconds ?? 10
                 context.insert(step)
                 roll.devSteps.append(step)
             }
@@ -229,5 +246,8 @@ enum BackupManager {
             batch.createdAt = rec.createdAt
             context.insert(batch)
         }
+
+        // Commit the whole restore in one transaction.
+        try context.save()
     }
 }

@@ -13,9 +13,16 @@
 import Foundation
 import SwiftData
 
-/// Runs on every launch. Any FilmRoll with loadedAt == nil was created before v1.8
+/// One-time migration: any FilmRoll with loadedAt == nil was created before v1.8
 /// (or restored from a pre-v1.8 backup) and should default to Done.
+///
+/// Gated behind a UserDefaults flag so it runs exactly once. Running it on every
+/// launch would corrupt rolls created later with a non-`.loaded` status (their
+/// loadedAt is intentionally nil) by force-resetting them to Done.
 func migrateLegacyRollsToDone(context: ModelContext) {
+    let migratedKey = "didMigrateRollStatusV18"
+    guard !UserDefaults.standard.bool(forKey: migratedKey) else { return }
+
     let descriptor = FetchDescriptor<FilmRoll>()
     guard let rolls = try? context.fetch(descriptor) else { return }
     var changed = false
@@ -25,4 +32,5 @@ func migrateLegacyRollsToDone(context: ModelContext) {
         changed = true
     }
     if changed { try? context.save() }
+    UserDefaults.standard.set(true, forKey: migratedKey)
 }

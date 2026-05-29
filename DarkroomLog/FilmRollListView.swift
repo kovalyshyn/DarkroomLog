@@ -1,16 +1,6 @@
 import SwiftUI
 import SwiftData
 
-private func statusColor(_ s: FilmRollStatus) -> Color {
-    switch s {
-    case .loaded:     return .blue
-    case .exposed:    return .orange
-    case .developing: return .purple
-    case .developed:  return .green
-    case .done:       return .secondary
-    }
-}
-
 struct FilmRollListView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \FilmRoll.date, order: .reverse) private var rolls: [FilmRoll]
@@ -71,8 +61,13 @@ struct FilmRollListView: View {
     }
 
     private func deleteRolls(at offsets: IndexSet) {
+        // FilmRoll has no inverse relationship to Print, so deleting a roll would
+        // leave Print.filmRoll pointing at a deleted object. Null those links first.
+        let allPrints = (try? context.fetch(FetchDescriptor<Print>())) ?? []
         for i in offsets {
-            context.delete(filteredRolls[i])
+            let roll = filteredRolls[i]
+            for p in allPrints where p.filmRoll?.id == roll.id { p.filmRoll = nil }
+            context.delete(roll)
         }
     }
 }
@@ -90,8 +85,8 @@ struct FilmRollRow: View {
                     .font(.caption)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
-                    .background(statusColor(roll.rollStatus).opacity(0.15))
-                    .foregroundStyle(statusColor(roll.rollStatus))
+                    .background(roll.rollStatus.color.opacity(0.15))
+                    .foregroundStyle(roll.rollStatus.color)
                     .clipShape(Capsule())
                 Text(roll.filmType)
                     .font(.caption)
@@ -148,7 +143,7 @@ struct FilmRollDetailView: View {
                     Text("Status")
                     Spacer()
                     Label(roll.rollStatus.label, systemImage: roll.rollStatus.icon)
-                        .foregroundStyle(statusColor(roll.rollStatus))
+                        .foregroundStyle(roll.rollStatus.color)
                         .font(.callout)
                 }
             }
@@ -220,7 +215,7 @@ struct FilmRollDetailView: View {
                     ForEach(history, id: \.0) { s, date in
                         HStack {
                             Label(s.label, systemImage: s.icon)
-                                .foregroundStyle(statusColor(s))
+                                .foregroundStyle(s.color)
                             Spacer()
                             Text(date.formatted(date: .abbreviated, time: .omitted))
                                 .foregroundStyle(.secondary)
@@ -299,6 +294,7 @@ struct FilmRollDetailView: View {
         }
         .sheet(item: $editingStep) { step in
             FilmDevStepFormView(
+                isNew: false,
                 existingName: step.name,
                 existingSeconds: step.seconds,
                 existingAgitation: step.agitationScheme
@@ -521,6 +517,7 @@ struct FilmRollSharePreviewSheet: View {
 struct FilmDevStepFormView: View {
     @Environment(\.dismiss) private var dismiss
 
+    var isNew: Bool = true
     var existingName: String = ""
     var existingSeconds: Int = 60
     var existingAgitation: AgitationScheme? = nil
@@ -556,7 +553,7 @@ struct FilmDevStepFormView: View {
                     }
                 }
             }
-            .navigationTitle(existingSeconds == 0 && existingName.isEmpty ? "New Step" : "Edit Step")
+            .navigationTitle(isNew ? "New Step" : "Edit Step")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

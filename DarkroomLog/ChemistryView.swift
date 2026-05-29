@@ -83,20 +83,6 @@ struct ChemistryView: View {
 struct ChemBatchRow: View {
     let batch: ChemBatch
 
-    private var usagePercent: Double { Double(batch.usedUnits) / Double(max(1, batch.maxUnits)) }
-    private var expiryDate: Date {
-        Calendar.current.date(byAdding: .month, value: batch.expiryMonths, to: batch.mixedOn) ?? batch.mixedOn
-    }
-    private var isExpired: Bool { Date() >= expiryDate }
-    private var daysLeft: Int {
-        max(0, Calendar.current.dateComponents([.day], from: Date(), to: expiryDate).day ?? 0)
-    }
-    private var statusColor: Color {
-        if isExpired || usagePercent > 0.9 { return .red }
-        if daysLeft < 14 || usagePercent > 0.75 { return .orange }
-        return .green
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
@@ -104,12 +90,12 @@ struct ChemBatchRow: View {
                     .font(.headline)
                 Spacer()
                 Circle()
-                    .fill(statusColor)
+                    .fill(batch.statusColor)
                     .frame(width: 8, height: 8)
             }
 
-            ProgressView(value: min(1.0, usagePercent))
-                .tint(statusColor)
+            ProgressView(value: min(1.0, batch.usagePercent))
+                .tint(batch.statusColor)
 
             HStack {
                 Text("\(batch.usedUnits) / \(batch.maxUnits) rolls")
@@ -117,14 +103,14 @@ struct ChemBatchRow: View {
                     .foregroundStyle(.secondary)
                 Spacer()
                 Group {
-                    if isExpired {
+                    if batch.isExpired {
                         Text("Expired")
                             .foregroundStyle(.red)
-                    } else if daysLeft < 14 {
-                        Text("Expires in \(daysLeft)d")
+                    } else if batch.daysLeft < 14 {
+                        Text("Expires in \(batch.daysLeft)d")
                             .foregroundStyle(.orange)
                     } else {
-                        Text("Until \(expiryDate.formatted(date: .abbreviated, time: .omitted))")
+                        Text("Until \(batch.expiryDate.formatted(date: .abbreviated, time: .omitted))")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -144,20 +130,6 @@ struct ChemBatchDetailView: View {
     @State private var showEdit = false
     @State private var showDeleteConfirm = false
 
-    private var usagePercent: Double { Double(batch.usedUnits) / Double(max(1, batch.maxUnits)) }
-    private var expiryDate: Date {
-        Calendar.current.date(byAdding: .month, value: batch.expiryMonths, to: batch.mixedOn) ?? batch.mixedOn
-    }
-    private var isExpired: Bool { Date() >= expiryDate }
-    private var daysLeft: Int {
-        max(0, Calendar.current.dateComponents([.day], from: Date(), to: expiryDate).day ?? 0)
-    }
-    private var statusColor: Color {
-        if isExpired || usagePercent > 0.9 { return .red }
-        if daysLeft < 14 || usagePercent > 0.75 { return .orange }
-        return .green
-    }
-
     var body: some View {
         List {
             // Progress
@@ -170,29 +142,29 @@ struct ChemBatchDetailView: View {
                             .font(.title3)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text("\(Int(min(1.0, usagePercent) * 100))%")
+                        Text("\(Int(min(1.0, batch.usagePercent) * 100))%")
                             .font(.title2.bold())
-                            .foregroundStyle(statusColor)
+                            .foregroundStyle(batch.statusColor)
                     }
-                    ProgressView(value: min(1.0, usagePercent))
-                        .tint(statusColor)
+                    ProgressView(value: min(1.0, batch.usagePercent))
+                        .tint(batch.statusColor)
                         .scaleEffect(x: 1, y: 2, anchor: .center)
                 }
                 .padding(.vertical, 6)
 
                 // Expiry status
-                if isExpired {
+                if batch.isExpired {
                     Label("Expired", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red)
-                } else if daysLeft < 14 {
+                } else if batch.daysLeft < 14 {
                     Label(
-                        "Expires in \(daysLeft) days — \(expiryDate.formatted(date: .abbreviated, time: .omitted))",
+                        "Expires in \(batch.daysLeft) days — \(batch.expiryDate.formatted(date: .abbreviated, time: .omitted))",
                         systemImage: "clock"
                     )
                     .foregroundStyle(.orange)
                 } else {
                     Label(
-                        "Expires \(expiryDate.formatted(date: .abbreviated, time: .omitted))",
+                        "Expires \(batch.expiryDate.formatted(date: .abbreviated, time: .omitted))",
                         systemImage: "calendar"
                     )
                     .foregroundStyle(.secondary)

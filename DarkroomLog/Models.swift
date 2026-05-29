@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import SwiftUI
 
 enum FilmRollStatus: String, CaseIterable {
     case loaded, exposed, developing, developed, done
@@ -21,6 +22,16 @@ enum FilmRollStatus: String, CaseIterable {
         case .developing: return "flask"
         case .developed:  return "film"
         case .done:       return "checkmark.circle"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .loaded:     return .blue
+        case .exposed:    return .orange
+        case .developing: return .purple
+        case .developed:  return .green
+        case .done:       return .secondary
         }
     }
 }
@@ -59,6 +70,11 @@ class Equipment {
     init(name: String, equipmentType: EquipmentType) {
         self.name = name
         self.category = equipmentType.rawValue
+    }
+
+    init(name: String, category: String) {
+        self.name = name
+        self.category = category
     }
 }
 
@@ -206,6 +222,24 @@ class ChemBatch {
     var usedUnits: Int     // manually incremented
     var expiryMonths: Int
     var createdAt: Date
+
+    var usagePercent: Double { Double(usedUnits) / Double(max(1, maxUnits)) }
+
+    var expiryDate: Date {
+        Calendar.current.date(byAdding: .month, value: expiryMonths, to: mixedOn) ?? mixedOn
+    }
+
+    var isExpired: Bool { Date() >= expiryDate }
+
+    var daysLeft: Int {
+        max(0, Calendar.current.dateComponents([.day], from: Date(), to: expiryDate).day ?? 0)
+    }
+
+    var statusColor: Color {
+        if isExpired || usagePercent > 0.9 { return .red }
+        if daysLeft < 14 || usagePercent > 0.75 { return .orange }
+        return .green
+    }
 
     init(name: String = "", notes: String = "", mixedOn: Date = Date(),
          maxUnits: Int = 20, expiryMonths: Int = 6) {

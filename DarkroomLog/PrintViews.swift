@@ -137,10 +137,9 @@ struct AddPrintView: View {
             .photosPicker(isPresented: $showLibraryPicker, selection: $selectedPhoto, matching: .images)
             .onChange(of: selectedPhoto) { _, newItem in
                 Task {
-                    if let data = try? await newItem?.loadTransferable(type: Data.self),
-                       let image = UIImage(data: data) {
-                        photoData = compressedPhotoData(image)
-                    }
+                    guard let data = try? await newItem?.loadTransferable(type: Data.self) else { return }
+                    // Compress off the main actor — large photos would otherwise hitch the UI.
+                    photoData = await Task.detached { UIImage(data: data).flatMap { compressedPhotoData($0) } }.value
                 }
             }
             .sheet(isPresented: $showCamera) {
@@ -358,6 +357,9 @@ struct PrintDetailView: View {
             print.notes = print.notes.trimmingCharacters(in: .whitespaces)
         }
         .onReceive(ticker) { date in
+            // Only tick while a wash timer is running for this print; a new one can only
+            // be started from this same view (scheduleWash sets activeWashTimer directly).
+            guard activeWashTimer != nil else { return }
             now = date
             activeWashTimer = NotificationManager.shared.activeTimer(for: print.id.uuidString)
         }
@@ -382,10 +384,9 @@ struct PrintDetailView: View {
         .photosPicker(isPresented: $showLibraryPicker, selection: $selectedPhoto, matching: .images)
         .onChange(of: selectedPhoto) { _, newItem in
             Task {
-                if let data = try? await newItem?.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data) {
-                    print.photoData = compressedPhotoData(image)
-                }
+                guard let data = try? await newItem?.loadTransferable(type: Data.self) else { return }
+                // Compress off the main actor — large photos would otherwise hitch the UI.
+                print.photoData = await Task.detached { UIImage(data: data).flatMap { compressedPhotoData($0) } }.value
             }
         }
         .sheet(isPresented: $showCamera) {
