@@ -51,30 +51,17 @@ struct ChemistryView: View {
                     }
                 }
             }
-            .searchable(text: $searchText, prompt: "Search by name or notes…")
+            .listStyle(.insetGrouped)
+            .searchable(text: $searchText, prompt: "Name, notes…")
             .navigationTitle("Chemistry")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Menu {
-                        NavigationLink(destination: EquipmentLibraryView()) {
-                            Label("Equipment", systemImage: "tray.full")
-                        }
-                        NavigationLink(destination: SettingsView()) {
-                            Label("Settings", systemImage: "gearshape")
-                        }
-                        NavigationLink(destination: AboutView()) {
-                            Label("About", systemImage: "info.circle")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                }
                 ToolbarItem(placement: .primaryAction) {
                     Button { showAddForm = true } label: {
                         Image(systemName: "plus")
                     }
                 }
             }
+            .darkroomOverflowMenu()
             .overlay {
                 if batches.isEmpty {
                     ContentUnavailableView(
@@ -111,7 +98,7 @@ struct ChemBatchRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(batch.name)
                     .font(.headline)
@@ -144,7 +131,7 @@ struct ChemBatchRow: View {
                 .font(.caption)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
     }
 }
 

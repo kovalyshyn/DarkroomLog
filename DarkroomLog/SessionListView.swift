@@ -71,21 +71,6 @@ struct SessionListView: View {
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Menu {
-                        NavigationLink(destination: EquipmentLibraryView()) {
-                            Label("Equipment", systemImage: "tray.full")
-                        }
-                        NavigationLink(destination: SettingsView()) {
-                            Label("Settings", systemImage: "gearshape")
-                        }
-                        NavigationLink(destination: AboutView()) {
-                            Label("About", systemImage: "info.circle")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink(destination: TimerView()) {
                         Image(systemName: "timer")
@@ -99,15 +84,16 @@ struct SessionListView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showNewSession) {
-                NewSessionView()
-            }
+            .darkroomOverflowMenu()
             .onAppear {
                 washTimers = NotificationManager.shared.loadTimers()
             }
             .onReceive(ticker) { _ in
                 washTimers = NotificationManager.shared.loadTimers()
             }
+        }
+        .sheet(isPresented: $showNewSession) {
+            NewSessionView()
         }
     }
 
@@ -129,7 +115,7 @@ struct SessionRowView: View {
     let session: Session
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(session.name.isEmpty ? "Untitled session" : session.name)
                     .font(.headline)
@@ -137,13 +123,13 @@ struct SessionRowView: View {
                 Text("\(session.prints.count) prints")
                     .font(.caption)
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
+                    .padding(.vertical, 2)
                     .background(Color.blue.opacity(0.12))
                     .foregroundStyle(.blue)
                     .clipShape(Capsule())
             }
 
-            HStack(spacing: 4) {
+            HStack(spacing: 8) {
                 if !session.enlarger.isEmpty {
                     Text(session.enlarger)
                     Text("·").foregroundStyle(.secondary)
@@ -156,14 +142,14 @@ struct SessionRowView: View {
                     Text(session.paper)
                 }
             }
-            .font(.caption)
+            .font(.subheadline)
             .foregroundStyle(.secondary)
             .lineLimit(1)
 
             Text(session.date.formatted(date: .abbreviated, time: .omitted))
-                .font(.caption2)
+                .font(.caption)
                 .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
     }
 }

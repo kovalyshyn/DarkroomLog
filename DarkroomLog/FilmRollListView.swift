@@ -39,24 +39,10 @@ struct FilmRollListView: View {
                 }
                 .onDelete(perform: deleteRolls)
             }
+            .listStyle(.insetGrouped)
             .searchable(text: $searchText, prompt: "Name, film, camera…")
             .navigationTitle("Light Table")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Menu {
-                        NavigationLink(destination: EquipmentLibraryView()) {
-                            Label("Equipment", systemImage: "tray.full")
-                        }
-                        NavigationLink(destination: SettingsView()) {
-                            Label("Settings", systemImage: "gearshape")
-                        }
-                        NavigationLink(destination: AboutView()) {
-                            Label("About", systemImage: "info.circle")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink(destination: TimerView(darkroomMode: false)) {
                         Image(systemName: "timer")
@@ -68,6 +54,7 @@ struct FilmRollListView: View {
                     }
                 }
             }
+            .darkroomOverflowMenu()
             .overlay {
                 if rolls.isEmpty {
                     ContentUnavailableView(
