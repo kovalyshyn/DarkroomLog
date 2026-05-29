@@ -37,7 +37,7 @@ struct AddPrintView: View {
                         pickingRoll = true
                     } label: {
                         HStack {
-                            Text(selectedRoll.map { rollLabel($0) } ?? "None")
+                            Text(selectedRoll?.displayLabel ?? "None")
                                 .foregroundStyle(selectedRoll == nil ? .secondary : .primary)
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -47,6 +47,7 @@ struct AddPrintView: View {
                     }
                     .foregroundStyle(.primary)
                 }
+                .accessibilityLabel("Film roll: \(selectedRoll?.displayLabel ?? "none")")
 
                 Section("Exposure") {
                     HStack {
@@ -148,11 +149,6 @@ struct AddPrintView: View {
         }
     }
 
-    private func rollLabel(_ roll: FilmRoll) -> String {
-        let name = roll.name.isEmpty ? roll.film : roll.name
-        return name.isEmpty ? roll.filmType : "\(name) (\(roll.filmType))"
-    }
-
     private func save() {
         let newPrint = Print(exposureTimes: exposureTimes, notes: notes.trimmingCharacters(in: .whitespaces))
         newPrint.name = printName.trimmingCharacters(in: .whitespaces)
@@ -196,7 +192,7 @@ struct PrintDetailView: View {
             Section("Film Roll") {
                 if let roll = print.filmRoll {
                     NavigationLink(destination: FilmRollDetailView(roll: roll)) {
-                        Text(rollLabel(roll))
+                        Text(roll.displayLabel)
                     }
                     Button("Change roll…") { pickingRoll = true }
                         .foregroundStyle(.secondary)
@@ -332,19 +328,17 @@ struct PrintDetailView: View {
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                 }
+                .accessibilityLabel("Share")
             }
         }
         .sheet(isPresented: $showSharePreview) {
             PrintSharePreviewSheet(print: print)
         }
         .onAppear {
+            // exposureTimes is migrated to native [Int] at launch; fall back to the
+            // legacy single value just in case a row predates that migration.
             let existing = print.exposureTimes
-            if existing.isEmpty && print.exposureSeconds > 0 {
-                times = [print.exposureSeconds]
-                print.exposureTimesData = String(print.exposureSeconds)
-            } else {
-                times = existing
-            }
+            times = (existing.isEmpty && print.exposureSeconds > 0) ? [print.exposureSeconds] : existing
             activeWashTimer = NotificationManager.shared.activeTimer(for: print.id.uuidString)
         }
         .onChange(of: times) { _, newTimes in
@@ -392,12 +386,6 @@ struct PrintDetailView: View {
         .sheet(isPresented: $showCamera) {
             CameraImagePicker(imageData: $print.photoData)
         }
-    }
-
-    private func rollLabel(_ roll: FilmRoll) -> String {
-        let name = roll.name.isEmpty ? roll.film : roll.name
-        let type_ = roll.filmType
-        return name.isEmpty ? type_ : "\(name) (\(type_))"
     }
 
     private func scheduleWash(minutes: Int) {
@@ -530,9 +518,13 @@ struct StarRatingView: View {
                 Image(systemName: star <= rating ? "star.fill" : "star")
                     .foregroundStyle(star <= rating ? Color.yellow : Color.secondary)
                     .onTapGesture { rating = (rating == star) ? 0 : star }
+                    .accessibilityLabel("\(star) star\(star == 1 ? "" : "s")")
+                    .accessibilityAddTraits(star <= rating ? .isSelected : [])
             }
         }
         .font(.system(size: 20))
+        .accessibilityElement(children: .contain)
+        .accessibilityValue("\(rating) of 3")
     }
 }
 

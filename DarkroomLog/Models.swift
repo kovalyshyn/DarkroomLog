@@ -128,6 +128,12 @@ class FilmRoll {
         set { statusRaw = newValue.rawValue }
     }
 
+    /// "Name (135)" / "Film (120)" / "135" — used wherever a roll is shown in one line.
+    var displayLabel: String {
+        let n = name.isEmpty ? film : name
+        return n.isEmpty ? filmType : "\(n) (\(filmType))"
+    }
+
     var statusHistory: [(FilmRollStatus, Date)] {
         [
             (FilmRollStatus.loaded,     loadedAt),
@@ -257,8 +263,9 @@ class ChemBatch {
 class Print {
     var id: UUID
     var name: String = ""
-    var exposureSeconds: Int   // kept for migration from v1.0
-    var exposureTimesData: String = ""
+    var exposureSeconds: Int        // legacy v1.0 single time — kept for migration/backup
+    var exposureTimesData: String = ""  // legacy CSV — kept for migration/backup
+    var exposureTimes: [Int] = []   // native storage
     var aperture: String = ""
     var notes: String
     var rating: Int = 0        // 0 = unrated, 1–3 stars
@@ -267,15 +274,10 @@ class Print {
     var session: Session?
     var filmRoll: FilmRoll?
 
-    var exposureTimes: [Int] {
-        get { exposureTimesData.split(separator: ",").compactMap { Int($0) } }
-        set { exposureTimesData = newValue.map { String($0) }.joined(separator: ",") }
-    }
-
     init(exposureTimes: [Int] = [], notes: String = "") {
         self.id = UUID()
+        self.exposureTimes = exposureTimes
         self.exposureSeconds = exposureTimes.first ?? 0
-        self.exposureTimesData = exposureTimes.map { String($0) }.joined(separator: ",")
         self.notes = notes
         self.createdAt = Date()
     }

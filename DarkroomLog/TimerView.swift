@@ -186,7 +186,7 @@ struct TimerView: View {
             // Don't strand the screen at 2% if the app is backgrounded mid-timer;
             // restore on leaving and re-dim when we come back.
             guard darkroomMode, isRunning else { return }
-            screen?.brightness = (phase == .active) ? 0.02 : originalBrightness
+            screen?.brightness = (phase == .active) ? Self.dimmedBrightness : originalBrightness
         }
         .preferredColorScheme(.dark)
         .statusBarHidden(true)
@@ -217,6 +217,11 @@ struct TimerView: View {
             .compactMap { $0 as? UIWindowScene }.first?.screen
     }
 
+    /// Brightness the screen is dimmed to in darkroom mode (near-black).
+    private static let dimmedBrightness: CGFloat = 0.02
+    /// Above this, the current brightness is "real" (not already dimmed) and safe to remember.
+    private static let dimGuardThreshold: CGFloat = 0.05
+
     private func makeTickTimer() -> Timer {
         Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             if isPaused { return }
@@ -230,8 +235,8 @@ struct TimerView: View {
 
     private func startTimer() {
         // Never capture the already-dimmed value as "original".
-        if (screen?.brightness ?? 1) > 0.05 { originalBrightness = screen?.brightness ?? 0.5 }
-        if darkroomMode { screen?.brightness = 0.02 }
+        if (screen?.brightness ?? 1) > Self.dimGuardThreshold { originalBrightness = screen?.brightness ?? 0.5 }
+        if darkroomMode { screen?.brightness = Self.dimmedBrightness }
         isRunning = true
         isPaused = false
         elapsed = 0
@@ -378,9 +383,19 @@ struct TimerView: View {
 
     // MARK: - Motion detection
 
+    /// Shake / toss detection thresholds. Accelerometer magnitude is in g (|a| ≈ 1 at rest).
+    private enum Motion {
+        static let updateInterval = 0.05      // 20 Hz sampling
+        static let freefallThreshold = 0.35   // |a| below this ≈ free fall
+        static let minFreefallDuration = 0.04 // s of free fall to count as a toss
+        static let tossSpike = 1.2            // |a| spike ending a toss
+        static let knockSpike = 1.7           // |a| spike for a knock/tap
+        static let gestureCooldown = 0.5      // min s between accepted gestures
+    }
+
     private func startMotionDetection() {
         guard darkroomMode, motionManager.isAccelerometerAvailable else { return }
-        motionManager.accelerometerUpdateInterval = 0.05 // 20 Hz
+        motionManager.accelerometerUpdateInterval = Motion.updateInterval
 
         motionManager.startAccelerometerUpdates(to: .main) { data, _ in
             guard let data = data else { return }
@@ -390,7 +405,7 @@ struct TimerView: View {
                 data.acceleration.z * data.acceleration.z
             )
 
-            if magnitude < 0.35 {
+            if magnitude < Motion.freefallThreshold {
                 if !inFreefall {
                     inFreefall = true
                     freefallStart = Date()
@@ -399,13 +414,13 @@ struct TimerView: View {
                 if inFreefall {
                     inFreefall = false
                     let duration = Date().timeIntervalSince(freefallStart)
-                    if duration > 0.04 && magnitude > 1.2 {
+                    if duration > Motion.minFreefallDuration && magnitude > Motion.tossSpike {
                         triggerRestart()
                     }
                 }
             }
 
-            if magnitude > 1.7 {
+            if magnitude > Motion.knockSpike {
                 triggerRestart()
             }
         }
@@ -414,7 +429,7 @@ struct TimerView: View {
     private func triggerRestart() {
         guard isRunning else { return }
         let now = Date()
-        guard now.timeIntervalSince(lastGestureTime) > 0.5 else { return }
+        guard now.timeIntervalSince(lastGestureTime) > Motion.gestureCooldown else { return }
         lastGestureTime = now
         DispatchQueue.main.async { restartTimer() }
     }

@@ -129,8 +129,8 @@ enum BackupManager {
                     prints: s.prints.map { p in
                         PrintRecord(
                             id: p.id, name: p.name,
-                            exposureSeconds: p.exposureSeconds,
-                            exposureTimesData: p.exposureTimesData,
+                            exposureSeconds: p.exposureTimes.first ?? p.exposureSeconds,
+                            exposureTimesData: p.exposureTimes.map(String.init).joined(separator: ","),
                             aperture: p.aperture,
                             notes: p.notes, rating: p.rating,
                             createdAt: p.createdAt,
@@ -222,6 +222,7 @@ enum BackupManager {
                 p.name = pRec.name
                 p.exposureSeconds = pRec.exposureSeconds
                 p.exposureTimesData = pRec.exposureTimesData
+                p.exposureTimes = pRec.exposureTimesData.split(separator: ",").compactMap { Int($0) }
                 p.aperture = pRec.aperture
                 p.rating = pRec.rating
                 p.createdAt = pRec.createdAt

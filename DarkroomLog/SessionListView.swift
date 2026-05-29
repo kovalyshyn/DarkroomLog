@@ -75,6 +75,7 @@ struct SessionListView: View {
                     NavigationLink(destination: TimerView()) {
                         Image(systemName: "timer")
                     }
+                    .accessibilityLabel("Timer")
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
@@ -82,6 +83,7 @@ struct SessionListView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
+                    .accessibilityLabel("New session")
                 }
             }
             .darkroomOverflowMenu()

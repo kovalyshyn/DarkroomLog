@@ -29,13 +29,13 @@ struct SessionDetailView: View {
             }
 
             Section("Prints") {
-                ForEach(sortedPrints) { print in
-                    NavigationLink(destination: PrintDetailView(print: print)) {
-                        PrintRowView(print: print)
+                ForEach(sortedPrints) { entry in
+                    NavigationLink(destination: PrintDetailView(print: entry)) {
+                        PrintRowView(print: entry)
                     }
                     .swipeActions(edge: .leading) {
                         Button {
-                            duplicatePrint(print)
+                            duplicatePrint(entry)
                         } label: {
                             Label("Duplicate", systemImage: "plus.square.on.square")
                         }

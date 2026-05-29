@@ -34,3 +34,25 @@ func migrateLegacyRollsToDone(context: ModelContext) {
     if changed { try? context.save() }
     UserDefaults.standard.set(true, forKey: migratedKey)
 }
+
+/// One-time migration: populate Print.exposureTimes (native [Int]) from the legacy
+/// CSV string (exposureTimesData) or the v1.0 single exposureSeconds.
+func migratePrintExposures(context: ModelContext) {
+    let migratedKey = "didMigratePrintExposuresToArray"
+    guard !UserDefaults.standard.bool(forKey: migratedKey) else { return }
+
+    let prints = (try? context.fetch(FetchDescriptor<Print>())) ?? []
+    var changed = false
+    for p in prints where p.exposureTimes.isEmpty {
+        let fromCSV = p.exposureTimesData.split(separator: ",").compactMap { Int($0) }
+        if !fromCSV.isEmpty {
+            p.exposureTimes = fromCSV
+            changed = true
+        } else if p.exposureSeconds > 0 {
+            p.exposureTimes = [p.exposureSeconds]
+            changed = true
+        }
+    }
+    if changed { try? context.save() }
+    UserDefaults.standard.set(true, forKey: migratedKey)
+}

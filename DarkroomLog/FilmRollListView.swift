@@ -37,11 +37,13 @@ struct FilmRollListView: View {
                     NavigationLink(destination: TimerView(darkroomMode: false)) {
                         Image(systemName: "timer")
                     }
+                    .accessibilityLabel("Timer")
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button { showAdd = true } label: {
                         Image(systemName: "plus")
                     }
+                    .accessibilityLabel("New roll")
                 }
             }
             .darkroomOverflowMenu()

@@ -59,6 +59,7 @@ struct ChemistryView: View {
                     Button { showAddForm = true } label: {
                         Image(systemName: "plus")
                     }
+                    .accessibilityLabel("New chemical")
                 }
             }
             .darkroomOverflowMenu()
@@ -92,6 +93,7 @@ struct ChemBatchRow: View {
                 Circle()
                     .fill(batch.statusColor)
                     .frame(width: 8, height: 8)
+                    .accessibilityLabel(batch.isExpired ? "Expired" : (batch.daysLeft < 14 ? "Expiring soon" : "Fresh"))
             }
 
             ProgressView(value: min(1.0, batch.usagePercent))
