@@ -83,19 +83,8 @@ struct FilmRollRow: View {
                 Text(roll.name.isEmpty ? "Unnamed roll" : roll.name)
                     .font(.headline)
                 Spacer()
-                Text(roll.rollStatus.label)
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(roll.rollStatus.color.opacity(0.15))
-                    .foregroundStyle(roll.rollStatus.color)
-                    .clipShape(Capsule())
-                Text(roll.filmType)
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(Color.secondary.opacity(0.15))
-                    .clipShape(Capsule())
+                BadgeView(text: roll.rollStatus.label, tint: roll.rollStatus.color)
+                BadgeView(text: roll.filmType)
             }
 
             HStack(spacing: 8) {
@@ -140,28 +129,31 @@ struct FilmRollDetailView: View {
         Form {
             Section("Roll") {
                 LabeledContent("Format", value: roll.filmType)
+                    .font(.subheadline)
                 LabeledContent("Date", value: roll.date.formatted(date: .abbreviated, time: .omitted))
+                    .font(.subheadline)
                 HStack {
                     Text("Status")
                     Spacer()
                     Label(roll.rollStatus.label, systemImage: roll.rollStatus.icon)
                         .foregroundStyle(roll.rollStatus.color)
-                        .font(.callout)
                 }
+                .font(.subheadline)
             }
 
             if !roll.film.isEmpty || !roll.developer.isEmpty || !roll.camera.isEmpty || !roll.lens.isEmpty {
                 Section("Film") {
-                    if !roll.film.isEmpty      { LabeledContent("Film Stock", value: roll.film) }
-                    if !roll.developer.isEmpty { LabeledContent("Developer",  value: roll.developer) }
-                    if !roll.camera.isEmpty    { LabeledContent("Camera",     value: roll.camera) }
-                    if !roll.lens.isEmpty      { LabeledContent("Lens",       value: roll.lens) }
+                    if !roll.film.isEmpty      { LabeledContent("Film Stock", value: roll.film).font(.subheadline) }
+                    if !roll.developer.isEmpty { LabeledContent("Developer",  value: roll.developer).font(.subheadline) }
+                    if !roll.camera.isEmpty    { LabeledContent("Camera",     value: roll.camera).font(.subheadline) }
+                    if !roll.lens.isEmpty      { LabeledContent("Lens",       value: roll.lens).font(.subheadline) }
                 }
             }
 
             if !roll.notes.isEmpty {
                 Section("Notes") {
                     Text(roll.notes)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -173,6 +165,7 @@ struct FilmRollDetailView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(step.name.isEmpty ? "Step \(i + 1)" : step.name)
+                                .font(.subheadline)
                             Text(formatDevSeconds(step.seconds))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -221,8 +214,8 @@ struct FilmRollDetailView: View {
                             Spacer()
                             Text(date.formatted(date: .abbreviated, time: .omitted))
                                 .foregroundStyle(.secondary)
-                                .font(.callout)
                         }
+                        .font(.subheadline)
                     }
                     .onDelete { offsets in
                         for i in offsets {
@@ -235,6 +228,7 @@ struct FilmRollDetailView: View {
             Section("Prints (\(linkedPrints.count))") {
                 if linkedPrints.isEmpty {
                     Text("No prints linked to this roll")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(linkedPrints) { p in
@@ -243,7 +237,7 @@ struct FilmRollDetailView: View {
                                 let times = p.exposureTimes
                                 let timeStr = times.isEmpty ? "\(p.exposureSeconds)s" : times.map { "\($0)s" }.joined(separator: " · ")
                                 Text(p.name.isEmpty ? timeStr : p.name)
-                                    .font(.body)
+                                    .font(.subheadline)
                                 HStack(spacing: 6) {
                                     if !p.name.isEmpty {
                                         Text(timeStr)
@@ -262,7 +256,7 @@ struct FilmRollDetailView: View {
             }
         }
         .navigationTitle(roll.name.isEmpty ? (roll.film.isEmpty ? "Roll" : roll.film) : roll.name)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -270,6 +264,7 @@ struct FilmRollDetailView: View {
                 } label: {
                     Image(systemName: "square.and.arrow.up")
                 }
+                .accessibilityLabel("Share")
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Edit") { editingRoll = true }
@@ -333,86 +328,64 @@ struct FilmRollShareCardView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(roll.name.isEmpty ? (roll.film.isEmpty ? "Film Roll" : roll.film) : roll.name)
                         .font(.system(size: 26, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(ShareCardColor.title)
                     Text(roll.date.formatted(date: .long, time: .omitted))
                         .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.45))
+                        .foregroundStyle(ShareCardColor.muted)
                 }
                 Spacer()
                 Text(roll.filmType)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(ShareCardColor.badgeText)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.1))
+                    .background(ShareCardColor.badgeFill)
                     .clipShape(Capsule())
             }
             .padding(20)
 
-            Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
+            ShareCardHairline()
 
             VStack(alignment: .leading, spacing: 12) {
-                if !roll.film.isEmpty      { rollRow("film",          "Film Stock", roll.film) }
-                if !roll.developer.isEmpty { rollRow("flask",         "Developer",  roll.developer) }
-                if !roll.camera.isEmpty    { rollRow("camera",        "Camera",     roll.camera) }
-                if !roll.lens.isEmpty      { rollRow("camera.aperture","Lens",      roll.lens) }
+                if !roll.film.isEmpty      { ShareCardRow(icon: DRIcon.film,      label: "Film Stock", value: roll.film) }
+                if !roll.developer.isEmpty { ShareCardRow(icon: DRIcon.developer, label: "Developer",  value: roll.developer) }
+                if !roll.camera.isEmpty    { ShareCardRow(icon: DRIcon.camera,    label: "Camera",     value: roll.camera) }
+                if !roll.lens.isEmpty      { ShareCardRow(icon: DRIcon.lens,      label: "Lens",       value: roll.lens) }
             }
             .padding(20)
 
             if !roll.notes.isEmpty {
-                Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
+                ShareCardHairline()
                 VStack(alignment: .leading, spacing: 4) {
                     Text("NOTES")
                         .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.35))
+                        .foregroundStyle(ShareCardColor.label)
                         .tracking(0.8)
                     Text(roll.notes)
                         .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.8))
+                        .foregroundStyle(ShareCardColor.value)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(20)
             }
 
-            Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
+            ShareCardHairline()
 
             HStack {
-                Image(systemName: "photo.stack")
+                Image(systemName: DRIcon.prints)
                     .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(ShareCardColor.icon)
                 Text(printCount == 1 ? "1 print" : "\(printCount) prints")
                     .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(ShareCardColor.secondary)
                 Spacer()
-                Text("Generated with DarkroomLog")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.white.opacity(0.25))
+                ShareCardFooter()
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
         }
         .frame(width: 390)
-        .background(Color(white: 0.07))
-    }
-
-    private func rollRow(_ icon: String, _ label: String, _ value: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 13))
-                .foregroundStyle(.white.opacity(0.4))
-                .frame(width: 18)
-                .padding(.top, 1)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label.uppercased())
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.35))
-                    .tracking(0.8)
-                Text(value)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
+        .background(ShareCardColor.background)
     }
 }
 
@@ -735,7 +708,7 @@ struct FilmRollPickerView: View {
                         Text("None").foregroundStyle(.secondary)
                         Spacer()
                         if selection == nil {
-                            Image(systemName: "checkmark").foregroundStyle(.blue)
+                            Image(systemName: "checkmark").foregroundStyle(.tint)
                         }
                     }
                 }
@@ -751,12 +724,7 @@ struct FilmRollPickerView: View {
                                 Text(roll.name.isEmpty ? roll.film : roll.name)
                                     .font(.body)
                                 HStack(spacing: 6) {
-                                    Text(roll.filmType)
-                                        .font(.caption)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 1)
-                                        .background(Color.secondary.opacity(0.15))
-                                        .clipShape(Capsule())
+                                    BadgeView(text: roll.filmType)
                                     if !roll.camera.isEmpty {
                                         Text(roll.camera)
                                             .font(.caption)
@@ -771,7 +739,7 @@ struct FilmRollPickerView: View {
                             }
                             Spacer()
                             if selection?.id == roll.id {
-                                Image(systemName: "checkmark").foregroundStyle(.blue)
+                                Image(systemName: "checkmark").foregroundStyle(.tint)
                             }
                         }
                     }

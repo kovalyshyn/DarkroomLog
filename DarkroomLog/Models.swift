@@ -229,6 +229,8 @@ class ChemBatch {
     var expiryMonths: Int
     var createdAt: Date
 
+    enum ExpiryTier { case fresh, warning, expired }
+
     var usagePercent: Double { Double(usedUnits) / Double(max(1, maxUnits)) }
 
     var expiryDate: Date {
@@ -241,10 +243,20 @@ class ChemBatch {
         max(0, Calendar.current.dateComponents([.day], from: Date(), to: expiryDate).day ?? 0)
     }
 
+    /// Single source of truth for both the status dot and the status text,
+    /// so they can never disagree (red dot next to orange text, etc.).
+    var expiryTier: ExpiryTier {
+        if isExpired || usagePercent > 0.9 { return .expired }
+        if daysLeft < 14 || usagePercent > 0.75 { return .warning }
+        return .fresh
+    }
+
     var statusColor: Color {
-        if isExpired || usagePercent > 0.9 { return .red }
-        if daysLeft < 14 || usagePercent > 0.75 { return .orange }
-        return .green
+        switch expiryTier {
+        case .expired: return .red
+        case .warning: return .orange
+        case .fresh:   return .green
+        }
     }
 
     init(name: String = "", notes: String = "", mixedOn: Date = Date(),

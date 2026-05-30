@@ -125,13 +125,7 @@ struct SessionRowView: View {
                 Text(session.name.isEmpty ? "Untitled session" : session.name)
                     .font(.headline)
                 Spacer()
-                Text("\(session.prints.count) prints")
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(Color.blue.opacity(0.12))
-                    .foregroundStyle(.blue)
-                    .clipShape(Capsule())
+                BadgeView(text: "\(session.prints.count) prints", tint: .blue)
             }
 
             HStack(spacing: 8) {

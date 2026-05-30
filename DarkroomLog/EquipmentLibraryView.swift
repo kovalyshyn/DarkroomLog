@@ -155,7 +155,7 @@ struct EquipmentPickerView: View {
                         Text("None").foregroundStyle(.secondary)
                         Spacer()
                         if selection.isEmpty {
-                            Image(systemName: "checkmark").foregroundStyle(.blue)
+                            Image(systemName: "checkmark").foregroundStyle(.tint)
                         }
                     }
                 }
@@ -170,7 +170,7 @@ struct EquipmentPickerView: View {
                             Text(item.name)
                             Spacer()
                             if selection == item.name {
-                                Image(systemName: "checkmark").foregroundStyle(.blue)
+                                Image(systemName: "checkmark").foregroundStyle(.tint)
                             }
                         }
                     }

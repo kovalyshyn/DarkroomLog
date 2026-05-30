@@ -84,6 +84,22 @@ struct ChemistryView: View {
 struct ChemBatchRow: View {
     let batch: ChemBatch
 
+    private var statusText: String {
+        switch batch.expiryTier {
+        case .expired: return batch.isExpired ? "Expired" : "Exhausted"
+        case .warning: return batch.daysLeft < 14 ? "Expires in \(batch.daysLeft)d" : "Heavily used"
+        case .fresh:   return "Until \(batch.expiryDate.formatted(date: .abbreviated, time: .omitted))"
+        }
+    }
+
+    private var statusA11y: String {
+        switch batch.expiryTier {
+        case .expired: return "Expired or exhausted"
+        case .warning: return "Needs attention"
+        case .fresh:   return "Fresh"
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
@@ -93,7 +109,7 @@ struct ChemBatchRow: View {
                 Circle()
                     .fill(batch.statusColor)
                     .frame(width: 8, height: 8)
-                    .accessibilityLabel(batch.isExpired ? "Expired" : (batch.daysLeft < 14 ? "Expiring soon" : "Fresh"))
+                    .accessibilityLabel(statusA11y)
             }
 
             ProgressView(value: min(1.0, batch.usagePercent))
@@ -104,22 +120,13 @@ struct ChemBatchRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Group {
-                    if batch.isExpired {
-                        Text("Expired")
-                            .foregroundStyle(.red)
-                    } else if batch.daysLeft < 14 {
-                        Text("Expires in \(batch.daysLeft)d")
-                            .foregroundStyle(.orange)
-                    } else {
-                        Text("Until \(batch.expiryDate.formatted(date: .abbreviated, time: .omitted))")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .font(.caption)
+                Text(statusText)
+                    .font(.caption)
+                    .foregroundStyle(batch.expiryTier == .fresh ? Color.secondary : batch.statusColor)
             }
         }
         .padding(.vertical, 2)
+        .sensoryFeedback(.impact(weight: .light), trigger: batch.usedUnits)
     }
 }
 
@@ -133,7 +140,7 @@ struct ChemBatchDetailView: View {
     @State private var showDeleteConfirm = false
 
     var body: some View {
-        List {
+        Form {
             // Progress
             Section {
                 VStack(alignment: .leading, spacing: 10) {
@@ -176,11 +183,14 @@ struct ChemBatchDetailView: View {
             // Details
             Section("Details") {
                 LabeledContent("Mixed on", value: batch.mixedOn.formatted(date: .long, time: .omitted))
+                    .font(.subheadline)
                 LabeledContent("Capacity", value: "\(batch.maxUnits) rolls")
+                    .font(.subheadline)
                 LabeledContent("Shelf life", value: "\(batch.expiryMonths) months")
+                    .font(.subheadline)
                 if !batch.notes.isEmpty {
                     Text(batch.notes)
-                        .font(.callout)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -222,6 +232,7 @@ struct ChemBatchDetailView: View {
         }
         .navigationTitle(batch.name)
         .navigationBarTitleDisplayMode(.inline)
+        .sensoryFeedback(.impact(weight: .light), trigger: batch.usedUnits)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Edit") { showEdit = true }

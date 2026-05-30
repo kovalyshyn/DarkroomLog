@@ -515,18 +515,25 @@ struct StarRatingView: View {
     @Binding var rating: Int
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 2) {
             ForEach(1...3, id: \.self) { star in
-                Image(systemName: star <= rating ? "star.fill" : "star")
-                    .foregroundStyle(star <= rating ? Color.yellow : Color.secondary)
-                    .onTapGesture { rating = (rating == star) ? 0 : star }
-                    .accessibilityLabel("\(star) star\(star == 1 ? "" : "s")")
-                    .accessibilityAddTraits(star <= rating ? .isSelected : [])
+                Button {
+                    rating = (rating == star) ? 0 : star
+                } label: {
+                    Image(systemName: star <= rating ? "star.fill" : "star")
+                        .foregroundStyle(star <= rating ? Color.yellow : Color.secondary)
+                        .font(.system(size: 20))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(star) star\(star == 1 ? "" : "s")")
+                .accessibilityAddTraits(star <= rating ? .isSelected : [])
             }
         }
-        .font(.system(size: 20))
         .accessibilityElement(children: .contain)
         .accessibilityValue("\(rating) of 3")
+        .sensoryFeedback(.selection, trigger: rating)
     }
 }
 
@@ -564,7 +571,7 @@ struct PrintShareCardView: View {
                 .padding(.bottom, 18)
         }
         .frame(width: 390)
-        .background(Color(white: 0.07))
+        .background(ShareCardColor.background)
     }
 
     // Landscape: photo left (200pt), text right (190pt)
@@ -599,40 +606,35 @@ struct PrintShareCardView: View {
                         .offset(x: photoOffset.width, y: photoOffset.height)
                         .clipped()
                 }
-                Color(white: 0.07)
+                ShareCardColor.background
             }
         )
     }
 
     @ViewBuilder
     private func infoBlock(compact: Bool) -> some View {
-        let p: CGFloat     = compact ? 14 : 20
-        let title: CGFloat = compact ? 17 : 22
-        let body: CGFloat  = compact ? 12 : 14
-        let tag: CGFloat   = compact ? 8  : 9
-        let icon: CGFloat  = compact ? 11 : 13
-        let gap: CGFloat   = compact ? 10 : 14
+        let m: ShareCardMetrics = compact ? .compact : .full
 
-        VStack(alignment: .leading, spacing: gap) {
+        VStack(alignment: .leading, spacing: m.gap) {
             // Name only (no stars)
             if !print.name.isEmpty {
                 Text(print.name)
-                    .font(.system(size: title, weight: .bold))
-                    .foregroundStyle(.white)
+                    .font(.system(size: m.title, weight: .bold))
+                    .foregroundStyle(ShareCardColor.title)
                     .lineLimit(2)
             }
 
-            Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
+            ShareCardHairline()
 
             // Darkroom equipment from session
             let s = print.session
             let hasSession = (s?.enlarger.isEmpty == false) || (s?.lens.isEmpty == false) ||
                              (s?.paper.isEmpty == false)    || (s?.developer.isEmpty == false)
             if hasSession {
-                if let v = s?.enlarger,  !v.isEmpty { row("viewfinder",    "Enlarger",  v, body: body, tag: tag, icon: icon) }
-                if let v = s?.lens,      !v.isEmpty { row("camera.aperture","Lens",     v, body: body, tag: tag, icon: icon) }
-                if let v = s?.paper,     !v.isEmpty { row("doc.plaintext", "Paper",     v, body: body, tag: tag, icon: icon) }
-                if let v = s?.developer, !v.isEmpty { row("drop",          "Developer", v, body: body, tag: tag, icon: icon) }
+                if let v = s?.enlarger,  !v.isEmpty { ShareCardRow(icon: DRIcon.enlarger,  label: "Enlarger",  value: v, metrics: m) }
+                if let v = s?.lens,      !v.isEmpty { ShareCardRow(icon: DRIcon.lens,      label: "Lens",      value: v, metrics: m) }
+                if let v = s?.paper,     !v.isEmpty { ShareCardRow(icon: DRIcon.paper,     label: "Paper",     value: v, metrics: m) }
+                if let v = s?.developer, !v.isEmpty { ShareCardRow(icon: DRIcon.developer, label: "Developer", value: v, metrics: m) }
             }
 
             // Film: stock · format, then camera/lens/developer from roll
@@ -640,44 +642,21 @@ struct PrintShareCardView: View {
                 let filmValue = [roll.film, roll.filmType].filter { !$0.isEmpty }.joined(separator: " · ")
                 let hasFilmInfo = !filmValue.isEmpty || !roll.camera.isEmpty || !roll.lens.isEmpty || !roll.developer.isEmpty
                 if hasFilmInfo {
-                    Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
-                    if !filmValue.isEmpty      { row("film",           "Film",        filmValue,      body: body, tag: tag, icon: icon) }
-                    if !roll.camera.isEmpty    { row("camera",         "Camera",      roll.camera,    body: body, tag: tag, icon: icon) }
-                    if !roll.lens.isEmpty      { row("camera.aperture","Camera Lens", roll.lens,      body: body, tag: tag, icon: icon) }
-                    if !roll.developer.isEmpty { row("flask",          "Film Dev.",   roll.developer, body: body, tag: tag, icon: icon) }
+                    ShareCardHairline()
+                    if !filmValue.isEmpty      { ShareCardRow(icon: DRIcon.film,      label: "Film",        value: filmValue,      metrics: m) }
+                    if !roll.camera.isEmpty    { ShareCardRow(icon: DRIcon.camera,    label: "Camera",      value: roll.camera,    metrics: m) }
+                    if !roll.lens.isEmpty      { ShareCardRow(icon: DRIcon.lens,      label: "Camera Lens", value: roll.lens,      metrics: m) }
+                    if !roll.developer.isEmpty { ShareCardRow(icon: DRIcon.developer, label: "Film Dev.",   value: roll.developer, metrics: m) }
                 }
             }
         }
-        .padding(p)
+        .padding(m.pad)
     }
 
     private var cardFooter: some View {
         HStack {
             Spacer()
-            Text("Generated with DarkroomLog")
-                .font(.system(size: 10))
-                .foregroundStyle(.white.opacity(0.25))
-        }
-    }
-
-    private func row(_ sfIcon: String, _ label: String, _ value: String,
-                     body: CGFloat, tag: CGFloat, icon: CGFloat) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: sfIcon)
-                .font(.system(size: icon))
-                .foregroundStyle(.white.opacity(0.4))
-                .frame(width: 16)
-                .padding(.top, 1)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(label.uppercased())
-                    .font(.system(size: tag, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.35))
-                    .tracking(0.8)
-                Text(value)
-                    .font(.system(size: body))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            ShareCardFooter()
         }
     }
 }

@@ -25,6 +25,7 @@ struct TimerView: View {
     @State private var skipIntervals: Bool = false
     @State private var isAgitating: Bool = false
     @State private var agitationPulse: Double = 0
+    @State private var restartTick: Int = 0
 
     private var isDevTimer: Bool {
         !darkroomMode && !intervals.isEmpty
@@ -78,11 +79,11 @@ struct TimerView: View {
                         if let name = currentStepName {
                             Text(name)
                                 .font(.system(size: 16, weight: .light))
-                                .foregroundStyle(darkroomMode ? Color(red: 0.5, green: 0.05, blue: 0.05) : Color.white.opacity(0.55))
+                                .foregroundStyle(darkroomMode ? DarkroomColor.stepName : Color.white.opacity(0.55))
                         }
                         Text("\(min(nextTargetIndex + 1, intervals.count)) / \(intervals.count)")
                             .font(.system(size: 14, weight: .regular))
-                            .foregroundStyle(darkroomMode ? Color(red: 0.4, green: 0, blue: 0) : Color.white.opacity(0.4))
+                            .foregroundStyle(darkroomMode ? DarkroomColor.timeIdle : Color.white.opacity(0.4))
                     }
                     .padding(.bottom, 10)
                 }
@@ -90,7 +91,7 @@ struct TimerView: View {
                 Text(formattedTime)
                     .font(.system(size: 100, weight: .thin, design: .monospaced))
                     .foregroundStyle(darkroomMode
-                        ? (isRunning ? Color(red: 1, green: 0.08, blue: 0) : Color(red: 0.4, green: 0, blue: 0))
+                        ? (isRunning ? DarkroomColor.timeActive : DarkroomColor.timeIdle)
                         : (isRunning
                             ? (isDevTimer && isPaused ? Color.white.opacity(0.45) : Color.white)
                             : Color.white.opacity(0.35)))
@@ -101,10 +102,10 @@ struct TimerView: View {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             Rectangle()
-                                .fill(darkroomMode ? Color(red: 0.2, green: 0, blue: 0) : Color.white.opacity(0.12))
+                                .fill(darkroomMode ? DarkroomColor.progressTrack : Color.white.opacity(0.12))
                                 .frame(height: 2)
                             Rectangle()
-                                .fill(darkroomMode ? Color(red: 0.85, green: 0.1, blue: 0) : Color.white.opacity(0.65))
+                                .fill(darkroomMode ? DarkroomColor.progressFill : Color.white.opacity(0.65))
                                 .frame(width: geo.size.width * max(0, min(1, stepProgress)), height: 2)
                                 .animation(.linear(duration: 1), value: elapsed)
                         }
@@ -126,8 +127,8 @@ struct TimerView: View {
                     Button("Use this time") { onStop(elapsed) }
                         .font(.system(size: 15, weight: .regular))
                         .foregroundStyle(isRunning || elapsed > 0
-                            ? Color(red: 0.7, green: 0.2, blue: 0.2)
-                            : Color(red: 0.3, green: 0.05, blue: 0.05))
+                            ? DarkroomColor.actionActive
+                            : DarkroomColor.actionIdle)
                         .disabled(!isRunning && elapsed == 0)
                         .padding(.bottom, 16)
                 }
@@ -151,7 +152,7 @@ struct TimerView: View {
                 }()
                 Text(hintText)
                     .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(darkroomMode ? Color(red: 0.3, green: 0.05, blue: 0.05) : Color.white.opacity(0.3))
+                    .foregroundStyle(darkroomMode ? DarkroomColor.actionIdle : Color.white.opacity(0.3))
                     .padding(.bottom, 48)
             }
         }
@@ -190,6 +191,9 @@ struct TimerView: View {
         }
         .preferredColorScheme(.dark)
         .statusBarHidden(true)
+        .sensoryFeedback(.impact(weight: .medium), trigger: isRunning)
+        .sensoryFeedback(.impact, trigger: nextTargetIndex)
+        .sensoryFeedback(.impact(weight: .heavy), trigger: restartTick)
     }
 
     private var formattedTime: String {
@@ -256,6 +260,7 @@ struct TimerView: View {
         isPaused = false
         isAgitating = false
         agitationPulse = 0
+        restartTick += 1
         timer = makeTickTimer()
     }
 

@@ -12,7 +12,7 @@ struct SessionDetailView: View {
     }
 
     var body: some View {
-        List {
+        Form {
             Section("Equipment") {
                 equipmentRow("Enlarger",  value: session.enlarger)
                 equipmentRow("Lens",      value: session.lens)
@@ -51,14 +51,14 @@ struct SessionDetailView: View {
                 }
             }
         }
-        .listStyle(.insetGrouped)
         .navigationTitle(session.name.isEmpty ? "Session" : session.name)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink(destination: TimerView()) {
                     Image(systemName: "timer")
                 }
+                .accessibilityLabel("Timer")
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Edit") { showEditSession = true }
@@ -74,13 +74,8 @@ struct SessionDetailView: View {
 
     @ViewBuilder
     private func equipmentRow(_ label: String, value: String) -> some View {
-        HStack {
-            Text(label).foregroundStyle(.secondary)
-            Spacer()
-            Text(value.isEmpty ? "—" : value)
-                .foregroundStyle(value.isEmpty ? .tertiary : .primary)
-        }
-        .font(.subheadline)
+        LabeledContent(label, value: value.isEmpty ? "—" : value)
+            .font(.subheadline)
     }
 
     private func deletePrints(at offsets: IndexSet) {
@@ -133,13 +128,7 @@ struct PrintRowView: View {
                         .font(.headline)
                     Spacer()
                     if print.rating > 0 {
-                        HStack(spacing: 2) {
-                            ForEach(1...3, id: \.self) { star in
-                                Image(systemName: star <= print.rating ? "star.fill" : "star")
-                                    .foregroundStyle(star <= print.rating ? Color.yellow : Color.clear)
-                                    .font(.system(size: 10))
-                            }
-                        }
+                        StarRatingDisplay(rating: print.rating)
                     }
                 }
                 if !print.name.isEmpty {
