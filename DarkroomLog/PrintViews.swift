@@ -556,14 +556,20 @@ struct PrintShareCardView: View {
         }
     }
 
-    // Portrait: photo top (full, no crop), text below
+    // Portrait: photo top, text below. The photo sits in a fixed frame matching its
+    // natural aspect, so at scale 1 / offset 0 it shows in full (no crop); zooming and
+    // dragging then reposition within that frame, mirroring the landscape layout.
     private var portraitCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let data = print.photoData, let uiImage = UIImage(data: data) {
+                let photoHeight = 390 * uiImage.size.height / max(1, uiImage.size.width)
                 Image(uiImage: uiImage)
                     .resizable()
-                    .scaledToFit()
-                    .frame(width: 390)
+                    .scaledToFill()
+                    .frame(width: 390, height: photoHeight)
+                    .scaleEffect(photoScale)
+                    .offset(x: photoOffset.width, y: photoOffset.height)
+                    .clipped()
             }
             infoBlock(compact: false)
             cardFooter
@@ -668,14 +674,14 @@ struct PrintSharePreviewSheet: View {
     let print: Print
     @Environment(\.dismiss) private var dismiss
     @State private var layout: ShareLayout = .portrait
-    @State private var thumbPortrait: UIImage? = nil
     @State private var shareItems: [Any]? = nil
-    // Photo repositioning (landscape only)
+    // Photo repositioning (both layouts)
     @GestureState private var dragOffset: CGSize = .zero
     @State private var accumulatedOffset: CGSize = .zero
     @GestureState private var pinchScale: CGFloat = 1.0
     @State private var accumulatedScale: CGFloat = 1.0
     @State private var landscapeCardHeight: CGFloat = 320
+    @State private var portraitCardHeight: CGFloat = 480
 
     private var photoOffset: CGSize {
         CGSize(width: accumulatedOffset.width + dragOffset.width,
@@ -691,66 +697,54 @@ struct PrintSharePreviewSheet: View {
             VStack(spacing: 0) {
                 // Preview
                 GeometryReader { geo in
+                    // Fit the whole card in the available area (both layouts).
+                    let cardHeight = layout == .landscape ? landscapeCardHeight : portraitCardHeight
+                    let scale = min((geo.size.width - 48) / 390,
+                                    (geo.size.height - 48) / max(1, cardHeight))
                     ZStack {
                         Color(.systemGroupedBackground).ignoresSafeArea()
 
-                        if layout == .landscape {
-                            // Live interactive preview for landscape
-                            let scale = (geo.size.width - 48) / 390
-                            VStack(spacing: 8) {
-                                PrintShareCardView(print: print, layout: .landscape,
-                                                   photoOffset: photoOffset,
-                                                   photoScale: photoScale)
-                                    .frame(width: 390)
-                                    .scaleEffect(scale, anchor: .top)
-                                    .frame(
-                                        width: geo.size.width - 48,
-                                        height: landscapeCardHeight * scale,
-                                        alignment: .top
-                                    )
-                                    .clipped()
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                                    .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
-                                    .gesture(
-                                        DragGesture()
-                                            .updating($dragOffset) { value, state, _ in
-                                                state = CGSize(
-                                                    width: value.translation.width / scale,
-                                                    height: value.translation.height / scale
-                                                )
-                                            }
+                        VStack(spacing: 8) {
+                            PrintShareCardView(print: print, layout: layout,
+                                               photoOffset: photoOffset,
+                                               photoScale: photoScale)
+                                .frame(width: 390)
+                                .scaleEffect(scale, anchor: .top)
+                                .frame(
+                                    width: 390 * scale,
+                                    height: cardHeight * scale,
+                                    alignment: .top
+                                )
+                                .clipped()
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
+                                .gesture(
+                                    DragGesture()
+                                        .updating($dragOffset) { value, state, _ in
+                                            state = CGSize(
+                                                width: value.translation.width / scale,
+                                                height: value.translation.height / scale
+                                            )
+                                        }
+                                        .onEnded { value in
+                                            accumulatedOffset.width  += value.translation.width  / scale
+                                            accumulatedOffset.height += value.translation.height / scale
+                                        }
+                                    .simultaneously(with:
+                                        MagnificationGesture()
+                                            .updating($pinchScale) { value, state, _ in state = value }
                                             .onEnded { value in
-                                                accumulatedOffset.width  += value.translation.width  / scale
-                                                accumulatedOffset.height += value.translation.height / scale
+                                                accumulatedScale = max(0.5, min(4.0, accumulatedScale * value))
                                             }
-                                        .simultaneously(with:
-                                            MagnificationGesture()
-                                                .updating($pinchScale) { value, state, _ in state = value }
-                                                .onEnded { value in
-                                                    accumulatedScale = max(0.5, min(4.0, accumulatedScale * value))
-                                                }
-                                        )
                                     )
-                                if print.photoData != nil {
-                                    Text("Drag to reposition photo")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        } else {
-                            // Static thumbnail for portrait (no crop)
-                            if let thumb = thumbPortrait {
-                                Image(uiImage: thumb)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                                    .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
-                                    .padding(24)
-                            } else {
-                                ProgressView()
+                                )
+                            if print.photoData != nil {
+                                Text("Drag to reposition · pinch to zoom")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
                         }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -797,7 +791,7 @@ struct PrintSharePreviewSheet: View {
                 }
             }
         }
-        .task { await renderPortraitThumb() }
+        .task { await measureCardHeights() }
         .sheet(isPresented: .init(
             get: { shareItems != nil },
             set: { if !$0 { shareItems = nil } }
@@ -808,21 +802,20 @@ struct PrintSharePreviewSheet: View {
         }
     }
 
+    // Measure each layout's card height at 1× (points == pixels) so the preview can
+    // fit the whole card and clip correctly.
     @MainActor
-    private func renderPortraitThumb() async {
-        let rp = ImageRenderer(content: PrintShareCardView(print: print, layout: .portrait))
-        rp.scale = 1.5
-        thumbPortrait = rp.uiImage
+    private func measureCardHeights() async {
+        let portrait = ImageRenderer(content: PrintShareCardView(print: print, layout: .portrait))
+        portrait.scale = 1.0
+        if let img = portrait.uiImage { portraitCardHeight = img.size.height }
 
-        // Measure landscape card height at 1× (pixels = points at scale 1)
-        let measurer = ImageRenderer(
+        let landscape = ImageRenderer(
             content: PrintShareCardView(print: print, layout: .landscape,
                                         photoOffset: .zero, photoScale: 1.0)
         )
-        measurer.scale = 1.0
-        if let img = measurer.uiImage {
-            landscapeCardHeight = img.size.height
-        }
+        landscape.scale = 1.0
+        if let img = landscape.uiImage { landscapeCardHeight = img.size.height }
     }
 
     private func saveToTemp(_ image: UIImage) -> URL? {
